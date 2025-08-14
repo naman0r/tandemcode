@@ -1,4 +1,6 @@
-# interview-pep-peer (working title)
+# TandemCode or CodeTandem
+
+- buy domain tandemcode.xyz it is $2 on namecheap
 
 **A real-time pair-programming + autograder platform** that focuses on collaboration quality, teaching signals (complexity, counterexamples), and a secure, scalable execution sandbox on AWS. This README is an early *planning* document: it defines goals, tradeoffs, architecture, folder layout, and an execution plan you can iterate on.
 
