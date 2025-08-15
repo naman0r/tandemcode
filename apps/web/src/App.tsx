@@ -1,6 +1,9 @@
 import { useState } from "react";
 import reactLogo from "./assets/react.svg";
 import viteLogo from "/vite.svg";
+import HeroSection from "./components/HeroSection";
+import Footer from "./components/Footer";
+import Header from "./components/Header";
 
 import {
   SignedIn,
@@ -8,17 +11,15 @@ import {
   SignInButton,
   UserButton,
 } from "@clerk/clerk-react";
+import { useNavigate } from "react-router-dom";
 
 export default function App() {
+  const navigate = useNavigate();
   return (
-    <header>
-      <div className="text-3xl font-bold underline text-red-900">hi</div>
-      <SignedOut>
-        <SignInButton />
-      </SignedOut>
-      <SignedIn>
-        <UserButton />
-      </SignedIn>
-    </header>
+    <>
+      <Header />
+      <HeroSection />
+      <Footer />
+    </>
   );
 }
