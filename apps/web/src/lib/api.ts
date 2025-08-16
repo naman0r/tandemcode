@@ -26,3 +26,33 @@ export const userApi = {
     return response.data;
   },
 };
+
+export const roomApi = {
+  // get all active rooms:
+
+  getAllRooms: async () => {
+    const response = await api.get("/rooms");
+    return response.data;
+  },
+
+  getRoom: async (id: string) => {
+    const response = await api.get(`/rooms/${id}`);
+    return response.data;
+  },
+
+  // creatw a new room:
+  createRoom: async (roomData: {
+    name: string;
+    description: string;
+    createdBy: string;
+  }) => {
+    const response = await api.post("/rooms", roomData);
+    return response.data;
+  },
+
+  // get rooms created by a specific user:
+  getRoomsByCreator: async (userId: string) => {
+    const response = await api.get(`/rooms/user/${userId}`);
+    return response.data;
+  },
+};
