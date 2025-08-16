@@ -1,5 +1,16 @@
 @import "tailwindcss";
 
+/* Custom text selection highlight colors */
+::selection {
+  background-color: #059669; /* Blue highlight - change this color */
+  color: white;
+}
+
+::-moz-selection {
+  background-color: #3b82f6; /* Blue highlight - change this color */
+  color: white;
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -7,7 +18,7 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: #d5e2ff;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;

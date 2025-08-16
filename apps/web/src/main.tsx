@@ -8,6 +8,10 @@ import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import SignIn from "./routes/SignIn.tsx";
 import SignUp from "./routes/SignUp.tsx";
 import Dashboard from "./routes/Dashboard.tsx";
+import Rooms from "./routes/rooms/Rooms.tsx";
+import JoinRoom from "./routes/rooms/JoinRoom.tsx";
+import RoomView from "./routes/rooms/RoomView.tsx";
+import CreateRoom from "./routes/rooms/CreateRoom.tsx";
 
 // Import your Publishable Key
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -21,6 +25,12 @@ const router = createBrowserRouter([
   { path: "/sign-in", element: <SignIn /> },
   { path: "/sign-up", element: <SignUp /> },
   { path: "/dashboard", element: <Dashboard /> },
+  { path: "/rooms", element: <Rooms /> },
+  { path: "/rooms/create", element: <CreateRoom /> },
+  { path: "/rooms/:roomId", element: <RoomView /> },
+  { path: "/rooms/join", element: <JoinRoom /> },
+
+  //{ path: "/rooms/:roomId/join", element: <JoinRoom /> },
 ]);
 
 createRoot(document.getElementById("root")!).render(

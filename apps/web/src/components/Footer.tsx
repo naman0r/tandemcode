@@ -1,4 +1,4 @@
-import { Code2, Github, Twitter, Linkedin } from "lucide-react";
+import { Github, Linkedin } from "lucide-react";
 
 const Footer = () => {
   return (
@@ -8,8 +8,8 @@ const Footer = () => {
           {/* Brand */}
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center space-x-3 mb-4">
-              <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl">
-                <Code2 className="w-5 h-5 text-white" />
+              <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-white/[0.1] to-purple-600/[0.1] rounded-xl">
+                <img src="/icon.png" alt="con" className="w-10 h-10" />
               </div>
               <div>
                 <h3 className="text-xl font-bold">TandemCode</h3>
