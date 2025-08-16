@@ -1,8 +1,6 @@
 package com.ipp.api.config;
 
-
 import com.ipp.api.websocket.RoomSocketHandler;
-
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
@@ -19,7 +17,7 @@ public class WebSocketConfig implements WebSocketConfigurer {
   @Override // this is where we will add our setup.....
   public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
 
-    registry.addHandler(new RoomSocketHandler(), "/ws/room/{roomId}")
+    registry.addHandler(new RoomSocketHandler(), "/ws/room/*")
             .setAllowedOrigins("*");
 
   }

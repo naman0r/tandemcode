@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
+import useWebSocket from "../hooks/UseWebSocket";
 
-interface Message {
+interface ChatMessage {
   id: string;
   text: string;
   username: string;
@@ -13,33 +14,12 @@ interface RoomChatComponentProps {
 }
 
 const RoomChatComponent: React.FC<RoomChatComponentProps> = ({ roomId }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    // Mock messages for UI demonstration
-    {
-      id: "1",
-      text: "Hey! Ready to solve some problems?",
-      username: "Sarah",
-      timestamp: new Date(Date.now() - 5 * 60 * 1000),
-      isOwn: false,
-    },
-    {
-      id: "2",
-      text: "Yes! Let's start with the two-sum problem",
-      username: "You",
-      timestamp: new Date(Date.now() - 3 * 60 * 1000),
-      isOwn: true,
-    },
-    {
-      id: "3",
-      text: "Perfect! I'll create a brute force solution first",
-      username: "Sarah",
-      timestamp: new Date(Date.now() - 1 * 60 * 1000),
-      isOwn: false,
-    },
-  ]);
+  // Use our WebSocket hook for real-time messaging
+  const { isConnected, messages, sendMessage, connectionState } = useWebSocket(
+    roomId || ""
+  );
 
   const [newMessage, setNewMessage] = useState("");
-  const [isConnected, setIsConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new messages arrive
@@ -49,18 +29,10 @@ const RoomChatComponent: React.FC<RoomChatComponentProps> = ({ roomId }) => {
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() || !isConnected) return;
 
-    // Add new message (you'll replace this with WebSocket send)
-    const message: Message = {
-      id: Date.now().toString(),
-      text: newMessage.trim(),
-      username: "You",
-      timestamp: new Date(),
-      isOwn: true,
-    };
-
-    setMessages((prev) => [...prev, message]);
+    // Send message through WebSocket
+    sendMessage(newMessage.trim());
     setNewMessage("");
   };
 
@@ -132,7 +104,7 @@ const RoomChatComponent: React.FC<RoomChatComponentProps> = ({ roomId }) => {
       </div>
 
       {/* Message Input */}
-      <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 rounded-b-xl">
+      <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 text-black rounded-b-xl">
         <form onSubmit={handleSendMessage} className="flex space-x-3">
           <input
             type="text"
