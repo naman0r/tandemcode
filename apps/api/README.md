@@ -55,6 +55,15 @@ GET /api/rooms/user/{userId} - gets rooms by creator
 Regular HTTP: Request → Response → Connection closes
 WebSocket: Connection stays open → Both sides can send messages anytime
 
+##### Websockets implementation and architecture:
+
+- problem: how do we keep track of who's in which room and send messages to only those people?
+- solution: we need a 'room manager' that tracks:
+  Room "room123" → [UserA_session, UserB_session, UserC_session]
+  Room "room456" → [UserD_session, UserE_session]
+
+<br/>
+
 <br/>
 whelp
 
