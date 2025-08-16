@@ -52,6 +52,9 @@ GET /api/rooms/user/{userId} - gets rooms by creator
 
 #### HTTP vs WebSockets:
 
+Regular HTTP: Request → Response → Connection closes
+WebSocket: Connection stays open → Both sides can send messages anytime
+
 <br/>
 whelp
 

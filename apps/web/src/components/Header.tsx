@@ -5,7 +5,7 @@ import {
   UserButton,
 } from "@clerk/clerk-react";
 import { useNavigate } from "react-router-dom";
-import { Code2, Users, Zap } from "lucide-react";
+import { Users, Zap } from "lucide-react";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -19,16 +19,8 @@ const Header = () => {
             className="flex items-center space-x-3 cursor-pointer group"
             onClick={() => navigate("/")}
           >
-            <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl group-hover:from-blue-700 group-hover:to-purple-700 transition-all duration-300 transform group-hover:scale-105">
-              <Code2 className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
-                TandemCode
-              </h1>
-              <p className="text-xs text-gray-500 leading-none">
-                Pair Programming
-              </p>
+            <div className="flex items-center justify-center w-40 pt-[1.7] h-10">
+              <img src="/tandemcode_logo.png" alt="logos" />
             </div>
           </div>
 
