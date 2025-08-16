@@ -1,0 +1,15 @@
+version: "3.9"
+services:
+  db:
+    image: postgres:13
+    container_name: tandemcode-db
+    environment:
+      POSTGRES_DB: tandemcode_dev
+      POSTGRES_USER: tandemcode
+      POSTGRES_PASSWORD: tandemcode
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+volumes:
+  db-data:
