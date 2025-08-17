@@ -266,4 +266,17 @@ POST /api/users (same ID) → 500 Duplicate Key Error (expected)
 
 ## August 15th: 2025: Backend + Frontend Integrated; Clerk sign in -> backend -> psql -> confirmation.
 
+## August 18th: WebSocket Handler still only uses Memory:
 
+The Issue:
+Your WebSocket handler currently:
+Only tracks sessions in memory (roomSessions map)
+Loses all presence data when server restarts
+Can't identify which real users are connected
+Can't show user profiles, names, or pictures
+The Goal:
+Transform it to:
+Save real user presence to the room_members database table
+Extract actual user IDs from WebSocket connections
+Persist presence across server restarts
+Enable displaying real user information

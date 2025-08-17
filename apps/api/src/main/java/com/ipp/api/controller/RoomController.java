@@ -2,7 +2,10 @@ package com.ipp.api.controller;
 
 
 import com.ipp.api.model.Room;
+import com.ipp.api.model.RoomMember;
+import com.ipp.api.repository.RoomMemberRepository;
 import com.ipp.api.repository.RoomRepository;
+import com.ipp.api.repository.UserRepository;
 
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -10,6 +13,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -26,9 +32,15 @@ import reactor.core.publisher.Mono;
 public class RoomController {
 
   private final RoomRepository roomRepository;
+  private final UserRepository userRepository;
+  private final RoomMemberRepository roomMemberRepository;
 
-  public RoomController(RoomRepository roomRepository) {
+  public RoomController(RoomRepository roomRepository,
+                        UserRepository userRepository,
+                        RoomMemberRepository roomMemberRepository) {
     this.roomRepository = roomRepository;
+    this.userRepository = userRepository;
+    this.roomMemberRepository = roomMemberRepository;
   }
 
 
@@ -59,6 +71,63 @@ public class RoomController {
   public Flux<Room> getRoomsByCreator(@PathVariable String userId) {
     return roomRepository.findByCreatedByAndIsActiveTrue(userId);
   }
+
+
+
+  @GetMapping("/{roomId}/members")
+  public Flux<UserInRoom> getRoomMembers (@PathVariable String roomId) {
+    // 1. Find all room members by roomId
+    // 2. For each member, get user details from users table
+    // 3. Combine the data and return
+
+    return roomMemberRepository.findByRoomId(roomId)
+            .flatMap(roomMember ->
+                    userRepository.findById(roomMember.getUserId())
+                            .map(user -> new UserInRoom(
+                                    user.getId(),
+                                    user.getName(),
+                                    user.getEmail(),
+                                    roomMember.getRole(),
+                                    roomMember.getJoinedAt()
+                            ))
+
+                    );
+
+
+
+
+  }
+
+  // DTO class type
+  public static class UserInRoom {
+
+    private String userId;
+    private String name;
+    private String email;
+    private String role;
+    private OffsetDateTime joinedAt;
+
+
+    // Constructor
+    public UserInRoom(String userId, String name, String email, String role, OffsetDateTime joinedAt) {
+      this.userId = userId;
+      this.name = name;
+      this.email = email;
+      this.role = role;
+      this.joinedAt = joinedAt;
+    }
+
+    // Getters
+    public String getUserId() { return userId; }
+    public String getName() { return name; }
+    public String getEmail() { return email; }
+    public String getRole() { return role; }
+    public OffsetDateTime getJoinedAt() { return joinedAt; }
+
+
+  }
+
+
 
 
 

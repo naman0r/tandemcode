@@ -1,18 +1,35 @@
 package com.ipp.api.websocket;
 
+import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import com.ipp.api.repository.RoomMemberRepository;
+import com.ipp.api.repository.UserRepository;
+import com.ipp.api.model.RoomMember;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 
+
+@Component
 public class RoomSocketHandler extends TextWebSocketHandler {
     
     // ROOM MANAGER: Maps roomId → Set of WebSocket sessions in that room
     private final Map<String, Set<WebSocketSession>> roomSessions = new ConcurrentHashMap<>();
+    
+    // Injected repositories for database operations
+    private final RoomMemberRepository roomMemberRepository;
+    private final UserRepository userRepository;
+    
+    // Constructor injection
+    public RoomSocketHandler(RoomMemberRepository roomMemberRepository, UserRepository userRepository) {
+        this.roomMemberRepository = roomMemberRepository;
+        this.userRepository = userRepository;
+    }
 
     //  HELPER: Extract room ID from WebSocket URL
     private String getRoomId(WebSocketSession session) {
@@ -24,10 +41,22 @@ public class RoomSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         String roomId = getRoomId(session);
+        String userId = getUserId(session);
         
         // Add this session to the room
         roomSessions.computeIfAbsent(roomId, k -> new CopyOnWriteArraySet<>()).add(session);
         
+
+        // database tracking 
+        if (userId != null) {
+            RoomMember roomMember = new RoomMember(roomId, userId, "participant", OffsetDateTime.now());
+            roomMemberRepository.save(roomMember)
+                .subscribe(
+                    result -> System.out.println(" Saved user " + userId + " to room " + roomId),
+                    error -> System.err.println(" Error saving to database: " + error)
+                );
+        }
+
         System.out.println("User connected to room: " + roomId +
                 " (Total in room: " + roomSessions.get(roomId).size() + ")");
     }
@@ -52,12 +81,26 @@ public class RoomSocketHandler extends TextWebSocketHandler {
       }
   }
 
+
+
+  private String getUserId(WebSocketSession session) {
+    String query = session.getUri().getQuery(); // "userId=user456"
+    if (query != null && query.startsWith("userId=")) {
+        return query.substring(7); // Extract "user456" from "userId=user456"
+    }
+    return null; // Handle case where no userId is provided
+  }
+
   // Called when someone disconnects
   @Override
   public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
       String roomId = getRoomId(session);
+      String userId = getUserId(session);
+
+
       Set<WebSocketSession> roomMembers = roomSessions.get(roomId);
-      
+
+
       if (roomMembers != null) {
           roomMembers.remove(session);
           
@@ -68,6 +111,17 @@ public class RoomSocketHandler extends TextWebSocketHandler {
           
           System.out.println("User disconnected from room: " + roomId +
                   " (Remaining: " + roomMembers.size() + ")");
+      }
+
+
+      // database cleanup
+      if (userId != null) {
+          roomMemberRepository.deleteByRoomIdAndUserId(roomId, userId)
+                  .subscribe(
+                          result -> System.out.println("Removed user " + userId + " from room " + roomId),
+                          error -> System.err.println("Error removing from database: " + error)
+                  );
+
       }
   }
 
