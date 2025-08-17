@@ -1,5 +1,6 @@
 // custom hook
 import { useState, useEffect, useRef } from "react";
+import { useUser } from "../hooks/useUser";
 
 interface ChatMessage {
   id: string;
@@ -19,6 +20,9 @@ const useWebSocket = (roomId: string) => {
     "connecting" | "connected" | "disconnected"
   >("disconnected");
 
+  const { clerkUser } = useUser();
+  const userId = clerkUser?.id;
+
   const wsRef = useRef<WebSocket | null>(null);
 
   const sendMessage = (text: string) => {
@@ -30,14 +34,16 @@ const useWebSocket = (roomId: string) => {
   };
 
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || !userId) return; // Wait for both roomId and userId
 
     // set connection state
     setConnectionState("connecting");
     setIsConnected(false);
 
     // create websocket connection
-    const ws = new WebSocket(`ws://localhost:8080/ws/room/${roomId}`);
+    const ws = new WebSocket(
+      `ws://localhost:8080/ws/room/${roomId}?userId=${userId}`
+    );
     wsRef.current = ws;
 
     // when the connection opens:
@@ -81,7 +87,7 @@ const useWebSocket = (roomId: string) => {
     return () => {
       ws.close();
     };
-  }, [roomId]); // reconnect when roomId changes
+  }, [roomId, userId]); // reconnect when roomId or userId changes
 
   return {
     isConnected,
