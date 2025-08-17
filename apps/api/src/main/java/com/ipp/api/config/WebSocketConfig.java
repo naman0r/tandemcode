@@ -14,10 +14,23 @@ import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry
 @EnableWebSocket // enables web socket support
 public class WebSocketConfig implements WebSocketConfigurer {
 
+
+  private final RoomSocketHandler roomSocketHandler;
+
+  // we manually add RoomSocketHandler to our registery, which means:
+  // Spring does not manage the object
+  // Spring cannot inject dependencies (like repositories) into it
+  // no @component @service @Repository magic works
+
+
+  public WebSocketConfig(RoomSocketHandler roomSocketHandler) {
+    this.roomSocketHandler = roomSocketHandler;
+  }
+
   @Override // this is where we will add our setup.....
   public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
 
-    registry.addHandler(new RoomSocketHandler(), "/ws/room/*")
+    registry.addHandler( roomSocketHandler, "/ws/room/*")
             .setAllowedOrigins("*");
 
   }

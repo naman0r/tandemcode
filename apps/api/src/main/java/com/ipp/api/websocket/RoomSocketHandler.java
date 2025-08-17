@@ -1,18 +1,36 @@
 package com.ipp.api.websocket;
 
+import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
+import com.ipp.api.repository.RoomMemberRepository;
+import com.ipp.api.repository.UserRepository;
+import com.ipp.api.model.RoomMember;
+import java.net.URI;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
 
+
+@Component
 public class RoomSocketHandler extends TextWebSocketHandler {
     
     // ROOM MANAGER: Maps roomId → Set of WebSocket sessions in that room
     private final Map<String, Set<WebSocketSession>> roomSessions = new ConcurrentHashMap<>();
+    
+    // Injected repositories for database operations
+    private final RoomMemberRepository roomMemberRepository;
+    private final UserRepository userRepository;
+    
+    // Constructor injection
+    public RoomSocketHandler(RoomMemberRepository roomMemberRepository, UserRepository userRepository) {
+        this.roomMemberRepository = roomMemberRepository;
+        this.userRepository = userRepository;
+    }
 
     //  HELPER: Extract room ID from WebSocket URL
     private String getRoomId(WebSocketSession session) {
