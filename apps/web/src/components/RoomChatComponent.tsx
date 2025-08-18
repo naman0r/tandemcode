@@ -22,9 +22,13 @@ const RoomChatComponent: React.FC<RoomChatComponentProps> = ({ roomId }) => {
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive (only if messages exist)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // Only scroll if there are actual messages
+    if (messages.length > 0) {
+      // ENABLE/DISABLE AUTOSCROLL. ANNOYINF GFR DEV WORK
+      //messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   }, [messages]);
 
   const handleSendMessage = (e: React.FormEvent) => {

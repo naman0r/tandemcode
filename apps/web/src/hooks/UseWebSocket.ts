@@ -26,10 +26,24 @@ const useWebSocket = (roomId: string) => {
   const wsRef = useRef<WebSocket | null>(null);
 
   const sendMessage = (text: string) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(text);
+    if (
+      wsRef.current &&
+      wsRef.current.readyState === WebSocket.OPEN &&
+      clerkUser
+    ) {
+      // Send structured message with user info
+      const messageData = {
+        text: text,
+        userId: clerkUser.id,
+        username: clerkUser.fullName || clerkUser.firstName || "Unknown User",
+        timestamp: new Date().toISOString(),
+      };
+
+      wsRef.current.send(JSON.stringify(messageData));
     } else {
-      console.log("websocket not connected, cannot send mesage");
+      console.log(
+        "websocket not connected or user not loaded, cannot send message"
+      );
     }
   };
 
@@ -57,16 +71,34 @@ const useWebSocket = (roomId: string) => {
     ws.onmessage = (event) => {
       console.log("received message", event.data);
 
-      const newMessage: ChatMessage = {
-        id: Date.now().toString(),
-        text: event.data,
-        username: "Other user", // improve later
-        timestamp: new Date(),
-        isOwn: false,
-      };
+      try {
+        // Try to parse as JSON (new format)
+        const messageData = JSON.parse(event.data);
 
-      // add message to our messages array.....
-      setMessages((prev) => [...prev, newMessage]);
+        const newMessage: ChatMessage = {
+          id: Date.now().toString(),
+          text: messageData.text,
+          username:
+            messageData.userId === clerkUser?.id ? "You" : messageData.username,
+          timestamp: new Date(messageData.timestamp),
+          isOwn: messageData.userId === clerkUser?.id,
+        };
+
+        setMessages((prev) => [...prev, newMessage]);
+      } catch (error) {
+        // Fallback for old format (plain text) - for backward compatibility
+        console.log("Received plain text message:", event.data);
+
+        const newMessage: ChatMessage = {
+          id: Date.now().toString(),
+          text: event.data,
+          username: "Other user",
+          timestamp: new Date(),
+          isOwn: false,
+        };
+
+        setMessages((prev) => [...prev, newMessage]);
+      }
     };
 
     // when the connection closes:
