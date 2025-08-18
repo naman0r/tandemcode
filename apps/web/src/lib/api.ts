@@ -55,4 +55,9 @@ export const roomApi = {
     const response = await api.get(`/rooms/user/${userId}`);
     return response.data;
   },
+
+  getMembersInRoom: async (roomId: string) => {
+    const response = await api.get(`/rooms/${roomId}/members`);
+    return response.data;
+  },
 };

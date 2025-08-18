@@ -1,5 +1,6 @@
 // custom hook
 import { useState, useEffect, useRef } from "react";
+import { useUser } from "../hooks/useUser";
 
 interface ChatMessage {
   id: string;
@@ -19,25 +20,44 @@ const useWebSocket = (roomId: string) => {
     "connecting" | "connected" | "disconnected"
   >("disconnected");
 
+  const { clerkUser } = useUser();
+  const userId = clerkUser?.id;
+
   const wsRef = useRef<WebSocket | null>(null);
 
   const sendMessage = (text: string) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(text);
+    if (
+      wsRef.current &&
+      wsRef.current.readyState === WebSocket.OPEN &&
+      clerkUser
+    ) {
+      // Send structured message with user info
+      const messageData = {
+        text: text,
+        userId: clerkUser.id,
+        username: clerkUser.fullName || clerkUser.firstName || "Unknown User",
+        timestamp: new Date().toISOString(),
+      };
+
+      wsRef.current.send(JSON.stringify(messageData));
     } else {
-      console.log("websocket not connected, cannot send mesage");
+      console.log(
+        "websocket not connected or user not loaded, cannot send message"
+      );
     }
   };
 
   useEffect(() => {
-    if (!roomId) return;
+    if (!roomId || !userId) return; // Wait for both roomId and userId
 
     // set connection state
     setConnectionState("connecting");
     setIsConnected(false);
 
     // create websocket connection
-    const ws = new WebSocket(`ws://localhost:8080/ws/room/${roomId}`);
+    const ws = new WebSocket(
+      `ws://localhost:8080/ws/room/${roomId}?userId=${userId}`
+    );
     wsRef.current = ws;
 
     // when the connection opens:
@@ -51,16 +71,34 @@ const useWebSocket = (roomId: string) => {
     ws.onmessage = (event) => {
       console.log("received message", event.data);
 
-      const newMessage: ChatMessage = {
-        id: Date.now().toString(),
-        text: event.data,
-        username: "Other user", // improve later
-        timestamp: new Date(),
-        isOwn: false,
-      };
+      try {
+        // Try to parse as JSON (new format)
+        const messageData = JSON.parse(event.data);
 
-      // add message to our messages array.....
-      setMessages((prev) => [...prev, newMessage]);
+        const newMessage: ChatMessage = {
+          id: Date.now().toString(),
+          text: messageData.text,
+          username:
+            messageData.userId === clerkUser?.id ? "You" : messageData.username,
+          timestamp: new Date(messageData.timestamp),
+          isOwn: messageData.userId === clerkUser?.id,
+        };
+
+        setMessages((prev) => [...prev, newMessage]);
+      } catch (error) {
+        // Fallback for old format (plain text) - for backward compatibility
+        console.log("Received plain text message:", event.data);
+
+        const newMessage: ChatMessage = {
+          id: Date.now().toString(),
+          text: event.data,
+          username: "Other user",
+          timestamp: new Date(),
+          isOwn: false,
+        };
+
+        setMessages((prev) => [...prev, newMessage]);
+      }
     };
 
     // when the connection closes:
@@ -81,7 +119,7 @@ const useWebSocket = (roomId: string) => {
     return () => {
       ws.close();
     };
-  }, [roomId]); // reconnect when roomId changes
+  }, [roomId, userId]); // reconnect when roomId or userId changes
 
   return {
     isConnected,

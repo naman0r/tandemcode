@@ -93,9 +93,6 @@ public class RoomController {
 
                     );
 
-
-
-
   }
 
   // DTO class type

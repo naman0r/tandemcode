@@ -1,23 +1,58 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import RoomChatComponent from "../../components/RoomChatComponent";
+import RoomMembersPanel from "../../components/RoomMembersPanel";
+import { roomApi } from "../../lib/api";
+import useWebSocket from "../../hooks/UseWebSocket";
 
 const RoomView = () => {
   const { roomId } = useParams();
-  const [isConnected, setIsConnected] = useState(false);
-  const [currentUsers] = useState([
-    { id: "1", name: "Sarah Chen", isOnline: true },
-    { id: "2", name: "You", isOnline: true },
-  ]);
+  const [roomData, setRoomData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Mock room data - you'll replace with API call
-  const roomData = {
-    name: "Python leetcode practice",
-    description: "Solve two-sum and array problems",
-    createdBy: "Sarah Chen",
-  };
+  // Get real WebSocket connection state
+  const { connectionState } = useWebSocket(roomId || "");
+  const isConnected = connectionState === "connected";
+
+  // Fetch real room data
+  useEffect(() => {
+    const fetchRoomData = async () => {
+      if (!roomId) return;
+
+      try {
+        setLoading(true);
+        const room = await roomApi.getRoom(roomId);
+        setRoomData(room);
+      } catch (error) {
+        console.error("Error fetching room:", error);
+        setRoomData({
+          name: "Room not found",
+          description: "This room may have been deleted or doesn't exist.",
+          createdBy: "Unknown",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRoomData();
+  }, [roomId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <Header />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+            <div className="text-center">Loading room...</div>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -48,7 +83,9 @@ const RoomView = () => {
                 Rooms
               </Link>
               <span className="text-gray-300">|</span>
-              <span className="text-gray-900 font-medium">{roomData.name}</span>
+              <span className="text-gray-900 font-medium">
+                {roomData?.name}
+              </span>
             </nav>
             <div className="flex items-center space-x-2 text-sm">
               <div
@@ -71,11 +108,11 @@ const RoomView = () => {
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                {roomData.name}
+                {roomData?.name}
               </h1>
-              <p className="text-gray-600 mb-4">{roomData.description}</p>
+              <p className="text-gray-600 mb-4">{roomData?.description}</p>
               <div className="flex items-center space-x-6 text-sm text-gray-500">
-                <span>Created by {roomData.createdBy}</span>
+                <span>Created by {roomData?.createdBy}</span>
                 <span>•</span>
                 <span>Room ID: {roomId}</span>
               </div>
@@ -83,10 +120,10 @@ const RoomView = () => {
 
             {/* Room Actions */}
             <div className="flex items-center space-x-3">
-              <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
+              <button className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200">
                 Share room
               </button>
-              <button className="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 transition-colors">
+              <button className="bg-red-50 text-red-700 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors border border-red-200">
                 Leave room
               </button>
             </div>
@@ -155,35 +192,10 @@ Explanation: nums[0] + nums[1] == 9`}
             </div>
           </div>
 
-          {/* Right Column: Chat & Users */}
+          {/* Right Column: Real User Presence & Chat */}
           <div className="space-y-6">
-            {/* Online Users */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Online users ({currentUsers.length})
-              </h3>
-              <div className="space-y-3">
-                {currentUsers.map((user) => (
-                  <div key={user.id} className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
-                      <span className="text-white text-sm font-medium">
-                        {user.name.charAt(0)}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">
-                        {user.name}
-                      </p>
-                    </div>
-                    <div
-                      className={`w-2 h-2 rounded-full ${
-                        user.isOnline ? "bg-green-500" : "bg-gray-300"
-                      }`}
-                    ></div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            {/* Real Room Members Panel */}
+            <RoomMembersPanel roomId={roomId || ""} />
 
             {/* Chat Component */}
             <div className="h-96">
