@@ -62,6 +62,8 @@ WebSocket: Connection stays open → Both sides can send messages anytime
   Room "room123" → [UserA_session, UserB_session, UserC_session]
   Room "room456" → [UserD_session, UserE_session]
 
+
+
 <br/>
 
 <br/>
