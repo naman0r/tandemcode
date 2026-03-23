@@ -60,4 +60,51 @@ export const roomApi = {
     const response = await api.get(`/rooms/${roomId}/members`);
     return response.data;
   },
+
+  setRoomProblem: async (roomId: string, problemId: string) => {
+    const response = await api.patch(`/rooms/${roomId}/problem`, { problemId });
+    return response.data;
+  },
+};
+
+export const problemApi = {
+  getAllProblems: async (difficulty?: string) => {
+    const params = difficulty ? { difficulty } : {};
+    const response = await api.get("/problems", { params });
+    return response.data;
+  },
+
+  getProblem: async (id: string) => {
+    const response = await api.get(`/problems/${id}`);
+    return response.data;
+  },
+
+  getProblemBySlug: async (slug: string) => {
+    const response = await api.get(`/problems/slug/${slug}`);
+    return response.data;
+  },
+};
+
+export const submissionApi = {
+  submit: async (data: {
+    roomId: string;
+    userId: string;
+    problemId: string;
+    language: string;
+    code: string;
+  }) => {
+    const response = await api.post("/submissions", data);
+    return response.data;
+  },
+
+  getSubmission: async (id: string) => {
+    const response = await api.get(`/submissions/${id}`);
+    return response.data;
+  },
+
+  getSubmissionsForRoom: async (roomId: string, userId?: string) => {
+    const params = userId ? { userId } : {};
+    const response = await api.get(`/submissions/room/${roomId}`, { params });
+    return response.data;
+  },
 };

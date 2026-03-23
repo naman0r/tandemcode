@@ -1,60 +1,64 @@
--- Enable UUID extension
-create extension if not exists pgcrypto;
+-- V1: Initial schema
+-- Matches the current application schema (TEXT IDs for Clerk integration)
 
-create table if not exists users (
-  id uuid primary key default gen_random_uuid(),
-  email text not null unique,
-  name text,
-  created_at timestamptz not null default now()
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY,
+  email TEXT NOT NULL UNIQUE,
+  name TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-create table if not exists rooms (
-  id uuid primary key default gen_random_uuid(),
-  created_by_user_id uuid not null references users(id),
-  status text not null default 'open',
-  created_at timestamptz not null default now()
+CREATE TABLE IF NOT EXISTS rooms (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_by TEXT NOT NULL REFERENCES users(id),
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-create table if not exists room_members (
-  room_id uuid not null references rooms(id),
-  user_id uuid not null references users(id),
-  role text not null default 'participant',
-  joined_at timestamptz not null default now(),
-  primary key (room_id, user_id)
+CREATE TABLE IF NOT EXISTS room_members (
+  room_id TEXT NOT NULL REFERENCES rooms(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  role TEXT NOT NULL DEFAULT 'participant',
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (room_id, user_id)
 );
 
-create table if not exists problems (
-  id uuid primary key default gen_random_uuid(),
-  slug text not null unique,
-  title text not null,
-  difficulty text,
-  time_limit_ms int not null default 2000,
-  mem_limit_mb int not null default 256
+CREATE TABLE IF NOT EXISTS problems (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  difficulty TEXT,
+  time_limit_ms INT NOT NULL DEFAULT 2000,
+  mem_limit_mb INT NOT NULL DEFAULT 256
 );
 
-create table if not exists problem_assets (
-  problem_id uuid primary key references problems(id),
-  s3_key_tests_json text not null
+CREATE TABLE IF NOT EXISTS problem_assets (
+  problem_id UUID PRIMARY KEY REFERENCES problems(id),
+  s3_key_tests_json TEXT NOT NULL
 );
 
-create table if not exists submissions (
-  id uuid primary key default gen_random_uuid(),
-  room_id uuid not null references rooms(id),
-  user_id uuid not null references users(id),
-  problem_id uuid not null references problems(id),
-  language text not null,
-  status text,
-  time_ms int,
-  created_at timestamptz not null default now(),
-  s3_key_stdout text,
-  s3_key_stderr text,
-  s3_key_result_json text
+CREATE TABLE IF NOT EXISTS submissions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  room_id TEXT NOT NULL REFERENCES rooms(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  problem_id UUID NOT NULL REFERENCES problems(id),
+  language TEXT NOT NULL,
+  status TEXT,
+  time_ms INT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  s3_key_stdout TEXT,
+  s3_key_stderr TEXT,
+  s3_key_result_json TEXT
 );
 
-create table if not exists events (
-  id bigserial primary key,
-  room_id uuid not null references rooms(id),
-  ts timestamptz not null default now(),
-  type text not null,
-  payload_json jsonb not null
+CREATE TABLE IF NOT EXISTS events (
+  id BIGSERIAL PRIMARY KEY,
+  room_id TEXT NOT NULL REFERENCES rooms(id),
+  ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  type TEXT NOT NULL,
+  payload_json JSONB NOT NULL
 );
