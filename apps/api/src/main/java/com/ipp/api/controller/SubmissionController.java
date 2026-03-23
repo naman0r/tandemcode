@@ -3,6 +3,10 @@ package com.ipp.api.controller;
 import com.ipp.api.model.Submission;
 import com.ipp.api.service.SubmissionService;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -29,12 +33,13 @@ public class SubmissionController {
   }
 
   @PostMapping
-  public Mono<Submission> submit(@RequestBody SubmitRequest req) {
+  public Mono<Submission> submit(@Valid @RequestBody SubmitRequest req) {
     return submissionService.submit(
         req.getRoomId(),
         req.getUserId(),
         req.getProblemId(),
-        req.getLanguage()
+        req.getLanguage(),
+        req.getCode()
     );
   }
 
@@ -54,10 +59,11 @@ public class SubmissionController {
   }
 
   public static class SubmitRequest {
-    private String roomId;
-    private String userId;
-    private UUID problemId;
-    private String language;
+    @NotBlank private String roomId;
+    @NotBlank private String userId;
+    @NotNull  private UUID problemId;
+    @NotBlank private String language;
+    @NotBlank private String code;
 
     public String getRoomId() { return roomId; }
     public void setRoomId(String roomId) { this.roomId = roomId; }
@@ -70,6 +76,9 @@ public class SubmissionController {
 
     public String getLanguage() { return language; }
     public void setLanguage(String language) { this.language = language; }
+
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
   }
 
 }

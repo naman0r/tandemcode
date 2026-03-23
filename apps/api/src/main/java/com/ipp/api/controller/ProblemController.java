@@ -3,6 +3,10 @@ package com.ipp.api.controller;
 import com.ipp.api.model.Problem;
 import com.ipp.api.service.ProblemService;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -47,7 +51,7 @@ public class ProblemController {
   }
 
   @PostMapping
-  public Mono<Problem> createProblem(@RequestBody CreateProblemRequest req) {
+  public Mono<Problem> createProblem(@Valid @RequestBody CreateProblemRequest req) {
     return problemService.create(
         req.getSlug(),
         req.getTitle(),
@@ -58,8 +62,9 @@ public class ProblemController {
   }
 
   public static class CreateProblemRequest {
-    private String slug;
-    private String title;
+    @NotBlank private String slug;
+    @NotBlank private String title;
+    @NotBlank @Pattern(regexp = "easy|medium|hard", message = "difficulty must be easy, medium, or hard")
     private String difficulty;
     private int timeLimitMs = 2000;
     private int memLimitMb = 256;

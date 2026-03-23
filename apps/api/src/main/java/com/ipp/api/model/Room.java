@@ -7,6 +7,7 @@ import org.springframework.data.domain.Persistable;
 import org.springframework.data.relational.core.mapping.Table;
 
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -26,6 +27,7 @@ public class Room implements Persistable<String> {
   private String createdBy;
   private Boolean isActive;
   private OffsetDateTime createdAt;
+  private UUID currentProblemId;
   
   // Constants
   public static final int MAX_CAPACITY = 2; // can increase this in the future.

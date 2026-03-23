@@ -29,6 +29,7 @@ public class Submission {
   private String userId;
   private UUID problemId;
   private String language;
+  private String code;
   private String status;
   private Integer timeMs;
   private OffsetDateTime createdAt;
@@ -37,11 +38,12 @@ public class Submission {
   private String s3KeyResultJson;
 
   // Constructor for creating a new submission (id is null, DB generates it)
-  public Submission(String roomId, String userId, UUID problemId, String language) {
+  public Submission(String roomId, String userId, UUID problemId, String language, String code) {
     this.roomId = roomId;
     this.userId = userId;
     this.problemId = problemId;
     this.language = language;
+    this.code = code;
     this.status = STATUS_PENDING;
     this.createdAt = OffsetDateTime.now();
   }

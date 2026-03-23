@@ -29,7 +29,7 @@ public class SubmissionService {
     this.roomRepository = roomRepository;
   }
 
-  public Mono<Submission> submit(String roomId, String userId, UUID problemId, String language) {
+  public Mono<Submission> submit(String roomId, String userId, UUID problemId, String language, String code) {
     // Validate that room and problem exist before creating the submission
     Mono<Boolean> roomExists = roomRepository.existsById(roomId)
         .flatMap(exists -> exists
@@ -42,7 +42,7 @@ public class SubmissionService {
             : Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Problem not found: " + problemId)));
 
     return Mono.zip(roomExists, problemExists)
-        .flatMap(tuple -> submissionRepository.save(new Submission(roomId, userId, problemId, language)));
+        .flatMap(tuple -> submissionRepository.save(new Submission(roomId, userId, problemId, language, code)));
   }
 
   public Mono<Submission> getById(UUID id) {
