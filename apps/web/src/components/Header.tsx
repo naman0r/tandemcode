@@ -34,7 +34,9 @@ const Header = () => {
             </div>
             <div className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer">
               <Zap className="w-4 h-4" />
-              <span className="text-sm font-medium">Problems</span>
+              <a href="/problems" className="text-sm font-medium">
+                Problems
+              </a>
             </div>
           </nav>
 
