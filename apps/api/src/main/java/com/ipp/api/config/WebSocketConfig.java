@@ -1,6 +1,7 @@
 package com.ipp.api.config;
 
 import com.ipp.api.websocket.RoomSocketHandler;
+import com.ipp.api.websocket.YjsSocketHandler;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
@@ -16,22 +17,21 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
 
   private final RoomSocketHandler roomSocketHandler;
+  private final YjsSocketHandler yjsSocketHandler;
 
-  // we manually add RoomSocketHandler to our registery, which means:
-  // Spring does not manage the object
-  // Spring cannot inject dependencies (like repositories) into it
-  // no @component @service @Repository magic works
-
-
-  public WebSocketConfig(RoomSocketHandler roomSocketHandler) {
+  public WebSocketConfig(RoomSocketHandler roomSocketHandler, YjsSocketHandler yjsSocketHandler) {
     this.roomSocketHandler = roomSocketHandler;
+    this.yjsSocketHandler = yjsSocketHandler;
   }
 
-  @Override // this is where we will add our setup.....
+  @Override
   public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-
-    registry.addHandler( roomSocketHandler, "/ws/room/*")
+    // Chat / presence
+    registry.addHandler(roomSocketHandler, "/ws/room/*")
             .setAllowedOrigins("*");
 
+    // Yjs CRDT binary relay for collaborative editing
+    registry.addHandler(yjsSocketHandler, "/ws/yjs/*")
+            .setAllowedOrigins("*");
   }
 }

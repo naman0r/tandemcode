@@ -5,6 +5,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import RoomChatComponent from "../../components/RoomChatComponent";
 import RoomMembersPanel from "../../components/RoomMembersPanel";
+import CollaborativeEditor from "../../components/CollaborativeEditor";
 import { roomApi, problemApi, submissionApi } from "../../lib/api";
 import useWebSocket from "../../hooks/UseWebSocket";
 
@@ -259,11 +260,10 @@ const RoomView = () => {
                 </div>
               </div>
 
-              <textarea
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                spellCheck={false}
-                className="w-full bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm h-64 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              <CollaborativeEditor
+                roomId={roomId || ""}
+                language={language}
+                onCodeChange={setCode}
               />
 
               {/* Submission status */}
