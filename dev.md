@@ -1,6 +1,9 @@
 ## commands
 
 ```bash
+# one-time: create apps/backend/.env from the template and set DB_PASSWORD
+cd apps/backend && cp .env.example .env
+
 # database
 cd apps/backend && docker compose up -d db
 
@@ -9,7 +12,4 @@ cd apps/backend && source .venv/bin/activate && uvicorn app.main:app --port 8080
 
 # frontend (port 5173)
 cd apps/web && npm run dev
-
-# tests
-cd apps/backend && pytest
 ```

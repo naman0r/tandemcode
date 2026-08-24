@@ -3,6 +3,3 @@
 __pycache__/
 *.py[cod]
 .env
-.pytest_cache/
-tests/
-requirements-dev.txt

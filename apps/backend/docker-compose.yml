@@ -1,18 +1,19 @@
+# Values come from the .env file in this directory (see .env.example).
+# ${VAR:?...} makes Compose fail loudly instead of substituting an empty string.
 services:
   db:
     image: postgres:13
     container_name: tandemcode-db
     environment:
-      POSTGRES_DB: tandemcode_dev
-      POSTGRES_USER: tandemcode
-      POSTGRES_PASSWORD: tandemcode
+      POSTGRES_DB: ${DB_NAME:?missing DB_NAME - copy .env.example to .env}
+      POSTGRES_USER: ${DB_USER:?missing DB_USER - copy .env.example to .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?missing DB_PASSWORD - copy .env.example to .env}
     ports:
-      # 5433 on the host avoids clashing with other local Postgres instances.
-      - "5433:5432"
+      - "${DB_PORT:-5433}:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U tandemcode -d tandemcode_dev"]
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -21,12 +22,14 @@ services:
     build: .
     container_name: tandemcode-backend
     environment:
+      # Inside the Compose network the database is "db" on its native port,
+      # which is why these two are not taken from .env.
       DB_HOST: db
       DB_PORT: 5432
-      DB_NAME: tandemcode_dev
-      DB_USER: tandemcode
-      DB_PASSWORD: tandemcode
-      CORS_ORIGINS: http://localhost:5173
+      DB_NAME: ${DB_NAME:?missing DB_NAME}
+      DB_USER: ${DB_USER:?missing DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD:?missing DB_PASSWORD}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
     ports:
       - "8080:8080"
     depends_on:
@@ -35,7 +38,4 @@ services:
 
 volumes:
   db-data:
-    # Named explicitly so the volume identity does not depend on the directory
-    # name. The Spring Boot app used to create this as "api_db-data"; to keep
-    # that old development data instead, change this to: name: api_db-data
     name: tandemcode-db-data

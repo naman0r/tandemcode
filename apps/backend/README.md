@@ -23,13 +23,13 @@ app/
   schemas/         Pydantic request/response models
   websocket/       room chat + Yjs relay managers
 migrations/        V<n>__<name>.sql, applied in order
-tests/             pytest suite
 ```
 
 ## Run
 
 ```bash
-# 1. Postgres (and optionally the backend itself) via Docker
+# 1. Credentials, then Postgres via Docker
+cp .env.example .env      # set DB_PASSWORD
 docker compose up -d db
 
 # 2. Dependencies
@@ -45,16 +45,26 @@ The whole stack in containers instead: `docker compose up --build`.
 
 ## Configuration
 
-Settings come from the environment, falling back to `.env` in this directory,
-falling back to defaults that match `docker-compose.yml`. Copy `.env.example` to
-`.env` to change them. Real environment variables always win over the file.
+Copy the template and set a password — this is required before anything runs:
+
+```bash
+cp .env.example .env
+# then fill in DB_PASSWORD
+```
+
+`.env` is gitignored and holds the real values. `docker-compose.yml` reads the
+same variables, so one file configures both the database container and the app.
+Real environment variables win over the file, which is how deployments override
+it. There is deliberately no fallback for `DB_PASSWORD`; a default would be how
+a credential ends up committed.
 
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `DB_HOST` | `localhost` | `db` when running in Compose |
 | `DB_PORT` | `5433` | host port, chosen to avoid clashing with other local Postgres |
 | `DB_NAME` | `tandemcode_dev` | |
-| `DB_USER` / `DB_PASSWORD` | `tandemcode` | |
+| `DB_USER` | `tandemcode` | |
+| `DB_PASSWORD` | **required** | no default, must be set in `.env` |
 | `CORS_ORIGINS` | `http://localhost:5173` | comma-separated |
 | `RUN_MIGRATIONS_ON_STARTUP` | `true` | matches the old Flyway-on-boot behaviour |
 
@@ -80,14 +90,3 @@ That matters because `V2` (`ALTER TABLE ... ADD COLUMN`) and `V3` (seed with a
 
 To add a migration, drop a new `V4__something.sql` in `migrations/`. Forward
 only — there are no down migrations.
-
-## Tests
-
-```bash
-pip install -r requirements-dev.txt
-pytest
-```
-
-The suite drives the real `app.main:app` with a stubbed connection pool, so
-routing, serialisation and websocket lifecycle are all covered without a
-database.
