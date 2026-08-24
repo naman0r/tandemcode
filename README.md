@@ -12,7 +12,7 @@
 * **Run** executes code inside **ephemeral containers** with strict CPU/RAM/time/no-network constraints.
 * **Problems** have **hidden tests** and a **complexity probe** (run on N, 2N, 4N to estimate time growth).
 * **Early differentiators**: timeline replay, counterexample surfacing, collaboration metrics, “write tests that break others” mode.
-* **Back end**: **FastAPI (Python 3.11)** with WebSocket realtime; jobs via **SQS**, runs on **ECS Fargate**, images in **ECR**, logs to **CloudWatch**, data in **RDS Postgres**.
+* **Back end**: **Spring Boot (WebFlux)** or Go (alternative) with WebSocket realtime; jobs via **SQS**, runs on **ECS Fargate**, images in **ECR**, logs to **CloudWatch**, data in **RDS Postgres**.
 
 > If momentum is a priority, ship **Python-only** MVP with SQS + Fargate and a single runner image. Add more languages and BYOR after MVP.
 
@@ -92,10 +92,6 @@
 ---
 
 ## 4) Why Spring Boot + WebFlux? (and STOMP?)
-
-> **Superseded.** The backend is now FastAPI (`apps/backend`); the Spring Boot
-> service was removed. The reasoning below is kept as a record of the original
-> decision. The conclusion still holds: raw JSON over WebSocket, no STOMP.
 
 * **WebFlux** is Spring’s reactive stack: great for many concurrent WS connections with fewer threads. It’s a good fit for realtime rooms.
 * **STOMP over WebSocket** is a text messaging protocol (topics, acks) that Spring supports out‑of‑the‑box. It can simplify pub/sub semantics (rooms as topics). **But** STOMP adds overhead and locks you to a specific framing.
@@ -178,19 +174,16 @@ interview-pep-peer/
 │  │  │  └─ state/
 │  │  ├─ public/
 │  │  └─ vite.config.ts
-│  ├─ backend/                   # FastAPI (Python 3.11)
-│  │  ├─ app/
-│  │  │  ├─ core/               # settings
-│  │  │  ├─ websocket/          # room chat + Yjs relay managers
-│  │  │  ├─ routes/             # REST endpoints (rooms, problems, submissions)
-│  │  │  ├─ services/           # RoomService, SubmissionService, ...
-│  │  │  ├─ dao/                # SQL queries (asyncpg)
-│  │  │  ├─ schemas/            # Pydantic request/response models
-│  │  │  └─ migrate.py          # SQL migration runner
-│  │  ├─ migrations/            # V<n>__<name>.sql
-│  │  ├─ tests/
-│  │  ├─ docker-compose.yml
-│  │  └─ Dockerfile
+│  ├─ api/                       # Spring Boot (WebFlux)
+│  │  ├─ src/main/java/com/ipp/
+│  │  │  ├─ config/              # security, CORS, WebSocket
+│  │  │  ├─ ws/                  # websocket handlers (raw JSON or STOMP)
+│  │  │  ├─ http/                # REST controllers (rooms, problems, runs)
+│  │  │  ├─ service/             # RoomService, RunService, AuthService
+│  │  │  ├─ repo/                # JPA/R2DBC repositories
+│  │  │  └─ model/               # entities + DTOs
+│  │  ├─ src/main/resources/
+│  │  └─ build.gradle
 │  ├─ runner/                    # Worker that polls SQS and starts Fargate tasks
 │  │  ├─ src/                    # can be Spring CLI or a small Go binary
 │  │  └─ Dockerfile
@@ -236,7 +229,7 @@ interview-pep-peer/
 ## 10) Local development workflow
 
 * **Web**: `cd apps/web && pnpm dev`
-* **Backend**: `cd apps/backend && uvicorn app.main:app --port 8080 --reload`
+* **API**: `cd apps/api && ./gradlew bootRun`
 * **Postgres**: run via Docker Compose locally.
 * **Judge image**: `docker build -t ipp-judge:py311 apps/judge-images/python`.
 * **Local run (no AWS)**: use `scripts/local-run.sh` to execute the judge with `--network=none`, `--read-only`, tmpfs, and ulimits.
@@ -416,7 +409,7 @@ Output JSON
 
 ## 20) Next steps (checklist)
 
-* [ ] Initialize monorepo with `apps/web`, `apps/backend`, `apps/runner`, `apps/judge-images/python`, `infra/terraform`.
+* [ ] Initialize monorepo with `apps/web`, `apps/api`, `apps/runner`, `apps/judge-images/python`, `infra/terraform`.
 * [ ] Web: Monaco + Yjs editor; room presence; WebSocket client.
 * [ ] API: WebFlux WS hub (rooms, presence), REST for problems/runs.
 * [ ] DB: create tables + migrations; seed Two Sum.
