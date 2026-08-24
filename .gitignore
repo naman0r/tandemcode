@@ -1,14 +1,4 @@
-# Any .env at any depth. The old '*/.env' only matched one level deep,
-# so apps/backend/.env would NOT have been ignored.
-**/.env
-**/.env.local
-
-.DS_Store
-**/.DS_Store
-*.py[cod]
-**/__pycache__/
-apps/backend/.pycache/
-apps/backend/.venv/
+*/.env
 
 tech-notes.md
 
