@@ -1,4 +1,8 @@
 */.env
+*.py[cod]
+**/__pycache__/
+apps/backend/.pycache/
+apps/backend/.venv/
 
 tech-notes.md
 
