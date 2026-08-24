@@ -1,15 +1,40 @@
 ## commands
 
+Run from the repository root. Each block is its own terminal.
+
+### One-time setup
+
 ```bash
-# one-time: create apps/backend/.env from the template and set DB_PASSWORD
-cd apps/backend && cp .env.example .env
+cd apps/backend
+cp .env.example .env          # then set DB_PASSWORD
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 
-# database
-cd apps/backend && docker compose up -d db
+cd ../web && npm install
+```
 
-# backend (port 8080)
-cd apps/backend && source .venv/bin/activate && uvicorn app.main:app --port 8080 --reload
+### Terminal 1 - database
 
-# frontend (port 5173)
-cd apps/web && npm run dev
+```bash
+(cd apps/backend && docker compose up -d db)
+```
+
+### Terminal 2 - backend, port 8080
+
+```bash
+(cd apps/backend && .venv/bin/uvicorn app.main:app --port 8080 --reload)
+```
+
+### Terminal 3 - frontend, port 5173
+
+```bash
+(cd apps/web && npm run dev)
+```
+
+Then open http://localhost:5173.
+
+Migrations run automatically when the backend boots. To apply them by hand:
+
+```bash
+(cd apps/backend && .venv/bin/python -m app.migrate)
 ```

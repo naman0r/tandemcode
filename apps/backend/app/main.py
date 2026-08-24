@@ -57,12 +57,10 @@ async def healthcheck() -> dict[str, str]:
 @app.websocket("/ws/room/{room_id}")
 async def room_websocket(websocket: WebSocket, room_id: str) -> None:
     manager: RoomChatManager = websocket.app.state.room_chat_manager
-    pool = websocket.app.state.db_pool
-    room_member_dao = RoomMemberDAO(pool)
+    room_member_dao = RoomMemberDAO(websocket.app.state.db_pool)
     user_id = websocket.query_params.get("userId")
 
-    await manager.connect(websocket, room_id)
-    await manager.add_member_if_possible(room_member_dao, room_id, user_id)
+    await manager.join(websocket, room_id, user_id, room_member_dao)
 
     try:
         while True:
@@ -71,8 +69,7 @@ async def room_websocket(websocket: WebSocket, room_id: str) -> None:
     except WebSocketDisconnect:
         pass
     finally:
-        manager.disconnect(websocket, room_id)
-        await manager.remove_member_if_possible(room_member_dao, room_id, user_id)
+        await manager.leave(websocket, room_id, room_member_dao)
 
 
 @app.websocket("/ws/yjs/{room_id}")
