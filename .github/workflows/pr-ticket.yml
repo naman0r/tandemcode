@@ -1,0 +1,124 @@
+name: PR ticket link
+
+# Every PR must close a GitHub issue. This only reports status - it blocks
+# nothing until "linked ticket" is marked a required check in branch protection
+# (Settings > Branches). Apply the "no-ticket" label to bypass it.
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited          # re-run when the body is fixed
+      - reopened
+      - synchronize
+      - ready_for_review
+      - labeled         # re-run when the bypass label is applied
+      - unlabeled
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: write
+
+jobs:
+  ticket:
+    name: linked ticket
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const BYPASS_LABEL = 'no-ticket';
+            const MARKER = '<!-- pr-ticket-check -->';
+
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const labels = pr.labels.map(l => l.name);
+
+            // The PR template documents "Closes #12" inside an HTML comment.
+            // Strip comments first or every PR passes on the example text.
+            const body = (pr.body || '').replace(/<!--[\s\S]*?-->/g, '');
+
+            const CLOSING = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)\b/gi;
+            const REFS = /\b(?:refs?|references?|relate[sd]\s+to|part\s+of)\s+#(\d+)\b/gi;
+
+            const nums = re => [...new Set([...body.matchAll(re)].map(m => m[1]))];
+            const closing = nums(CLOSING);
+            const refsOnly = nums(REFS).filter(n => !closing.includes(n));
+
+            async function describe(n) {
+              try {
+                const { data } = await github.rest.issues.get({
+                  owner, repo, issue_number: Number(n),
+                });
+                if (data.pull_request) return { n, ok: false, why: 'that is a pull request, not an issue' };
+                return { n, ok: true, title: data.title, state: data.state,
+                         assignee: data.assignee?.login,
+                         labels: data.labels.map(l => l.name || l) };
+              } catch (e) {
+                if (e.status === 404) return { n, ok: false, why: 'no such issue' };
+                throw e;
+              }
+            }
+
+            const found = await Promise.all(closing.map(describe));
+            const valid = found.filter(f => f.ok);
+
+            let pass, lines;
+            if (labels.includes(BYPASS_LABEL)) {
+              pass = true;
+              lines = [`Bypassed with the \`${BYPASS_LABEL}\` label.`];
+            } else if (valid.length) {
+              pass = true;
+              lines = ['**Linked ticket**', ''];
+              for (const f of valid) {
+                const meta = [
+                  f.state,
+                  f.assignee ? `@${f.assignee}` : 'unassigned',
+                  ...(f.labels.length ? [f.labels.join(', ')] : []),
+                ].join(' · ');
+                lines.push(`- #${f.n} — ${f.title}  \n  <sub>${meta}</sub>`);
+                if (f.state === 'closed') lines.push(`  > note: #${f.n} is already closed.`);
+              }
+              if (refsOnly.length) {
+                lines.push('', `Also references (will stay open): ${refsOnly.map(n => '#' + n).join(', ')}`);
+              }
+            } else {
+              pass = false;
+              lines = [
+                '**No linked ticket.**',
+                '',
+                'Add a closing reference to the PR description, on its own line:',
+                '',
+                '```',
+                'Closes #12',
+                '```',
+                '',
+                'Accepted keywords: `closes`, `fixes`, `resolves` (and their tenses).',
+              ];
+              if (refsOnly.length) {
+                lines.push('', `Found ${refsOnly.map(n => '#' + n).join(', ')}, but a plain reference does not close the issue. Use \`Closes\`.`);
+              }
+              for (const f of found.filter(x => !x.ok)) {
+                lines.push('', `\`#${f.n}\` cannot be used: ${f.why}.`);
+              }
+              lines.push('', `No ticket to link? Apply the \`${BYPASS_LABEL}\` label.`);
+            }
+
+            const comment = `${MARKER}\n${lines.join('\n')}`;
+            const existing = (await github.rest.issues.listComments({
+              owner, repo, issue_number: pr.number, per_page: 100,
+            })).data.find(c => c.body?.includes(MARKER));
+
+            try {
+              if (existing) {
+                await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: comment });
+              } else {
+                await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body: comment });
+              }
+            } catch (e) {
+              core.warning(`Could not post the summary comment: ${e.message}`);
+            }
+
+            if (!pass) core.setFailed('This PR does not close a ticket.');
