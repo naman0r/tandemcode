@@ -18,6 +18,21 @@
 
 ## Priority 2
 
+- [ ] **Bring back the backend test suite.** It was written during the Python
+      migration (43 tests: route contracts, websocket lifecycle, migration
+      discovery) and then removed to keep the refactor PR small. Re-add under
+      `apps/backend/tests/` with `pytest` + `pytest-asyncio` + `httpx`, in a
+      `requirements-dev.txt`. Recoverable from git history if wanted.
+
+- [ ] **GitHub Action to run the tests on every PR.** Needs a workflow at
+      `.github/workflows/backend.yml`: Python 3.11, a Postgres service
+      container, `pip install -r requirements-dev.txt`, then `pytest`. There is
+      no CI at all right now, so nothing checks a PR before merge.
+
+- [ ] Fix the presence race: the room websocket accepts the connection before
+      the `room_members` row is committed, so a `GET /members` fired straight
+      after joining can miss the user who just joined.
+
 - [x] Build frontend
 - [ ] Figure out how the backend eployment would work (render is a good option, so can use that)
 - [ ] Prod vs dev environments (what is actually differnt? )
