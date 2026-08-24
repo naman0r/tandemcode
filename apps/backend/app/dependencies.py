@@ -32,6 +32,7 @@ def get_room_service(request: Request) -> RoomService:
         room_dao=RoomDAO(pool),
         room_member_dao=RoomMemberDAO(pool),
         problem_dao=ProblemDAO(pool),
+        user_dao=UserDAO(pool),
     )
 
 
@@ -41,4 +42,5 @@ def get_submission_service(request: Request) -> SubmissionService:
         submission_dao=SubmissionDAO(pool),
         room_dao=RoomDAO(pool),
         problem_dao=ProblemDAO(pool),
+        user_dao=UserDAO(pool),
     )

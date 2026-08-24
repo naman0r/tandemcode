@@ -38,6 +38,11 @@ class UserDAO:
             row = await conn.fetchrow(query, user_id)
         return _map_user(row) if row else None
 
+    async def exists(self, user_id: str) -> bool:
+        query = "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)"
+        async with self.pool.acquire() as conn:
+            return bool(await conn.fetchval(query, user_id))
+
     async def list_all(self) -> list[dict]:
         query = """
             SELECT id, email, name, created_at

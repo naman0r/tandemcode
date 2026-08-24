@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.dao.room_members import RoomMemberDAO
 from app.database import create_pool
+from app.migrate import migrate
 from app.routes.problems import router as problems_router
 from app.routes.rooms import router as rooms_router
 from app.routes.submissions import router as submissions_router
@@ -21,6 +22,8 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.run_migrations_on_startup:
+        await migrate()
     app.state.db_pool = await create_pool()
     app.state.room_chat_manager = RoomChatManager()
     app.state.yjs_relay_manager = YjsRelayManager()
@@ -80,6 +83,11 @@ async def yjs_websocket(websocket: WebSocket, room_id: str) -> None:
     try:
         while True:
             message = await websocket.receive()
+            # receive() hands back the raw ASGI message, so the disconnect frame
+            # arrives as a value rather than an exception. Without this check the
+            # loop would call receive() again and raise RuntimeError.
+            if message["type"] == "websocket.disconnect":
+                break
             if message.get("bytes") is not None:
                 await manager.relay_bytes(room_id, websocket, message["bytes"])
             elif message.get("text") is not None:

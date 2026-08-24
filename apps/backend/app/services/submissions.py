@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from app.dao.problems import ProblemDAO
 from app.dao.rooms import RoomDAO
 from app.dao.submissions import SubmissionDAO
+from app.dao.users import UserDAO
 
 
 class SubmissionService:
@@ -13,10 +14,12 @@ class SubmissionService:
         submission_dao: SubmissionDAO,
         room_dao: RoomDAO,
         problem_dao: ProblemDAO,
+        user_dao: UserDAO,
     ) -> None:
         self.submission_dao = submission_dao
         self.room_dao = room_dao
         self.problem_dao = problem_dao
+        self.user_dao = user_dao
 
     async def submit(
         self,
@@ -38,6 +41,13 @@ class SubmissionService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Problem not found: {problem_id}",
+            )
+
+        user_exists = await self.user_dao.exists(user_id)
+        if not user_exists:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User not found: {user_id}",
             )
 
         return await self.submission_dao.create(room_id, user_id, problem_id, language, code)

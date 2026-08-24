@@ -1,4 +1,7 @@
 */.env
+
+.DS_Store
+**/.DS_Store
 *.py[cod]
 **/__pycache__/
 apps/backend/.pycache/

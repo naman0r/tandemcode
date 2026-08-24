@@ -1,3 +1,7 @@
+> **Historical.** This documents the Spring Boot service that used to live in
+> `apps/api`, replaced by the FastAPI backend in `apps/backend`. Kept for
+> context; it does not describe the current system.
+
 # TandemCode API Progress Log
 
 ## August 15, 2025 - Backend Foundation Complete ✅

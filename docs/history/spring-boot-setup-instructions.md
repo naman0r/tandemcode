@@ -1,3 +1,7 @@
+> **Historical.** This documents the Spring Boot service that used to live in
+> `apps/api`, replaced by the FastAPI backend in `apps/backend`. Kept for
+> context; it does not describe the current system.
+
 # Spring Boot API Setup (WebFlux + R2DBC + SQS) — Step‑by‑Step
 
 This guide boots your **`apps/api`** service with Spring Boot **WebFlux**, **R2DBC Postgres**, and an **SQS** publisher. It’s minimal, production‑leaning, and matches the MVP architecture from the planning README.

@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:13
+    container_name: tandemcode-db
+    environment:
+      POSTGRES_DB: tandemcode_dev
+      POSTGRES_USER: tandemcode
+      POSTGRES_PASSWORD: tandemcode
+    ports:
+      # 5433 on the host avoids clashing with other local Postgres instances.
+      - "5433:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tandemcode -d tandemcode_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: .
+    container_name: tandemcode-backend
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: tandemcode_dev
+      DB_USER: tandemcode
+      DB_PASSWORD: tandemcode
+      CORS_ORIGINS: http://localhost:5173
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:
+    # Named explicitly so the volume identity does not depend on the directory
+    # name. The Spring Boot app used to create this as "api_db-data"; to keep
+    # that old development data instead, change this to: name: api_db-data
+    name: tandemcode-db-data

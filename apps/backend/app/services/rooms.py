@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from app.dao.problems import ProblemDAO
 from app.dao.room_members import RoomMemberDAO
 from app.dao.rooms import RoomDAO
+from app.dao.users import UserDAO
 
 
 class RoomService:
@@ -15,12 +16,22 @@ class RoomService:
         room_dao: RoomDAO,
         room_member_dao: RoomMemberDAO,
         problem_dao: ProblemDAO,
+        user_dao: UserDAO,
     ) -> None:
         self.room_dao = room_dao
         self.room_member_dao = room_member_dao
         self.problem_dao = problem_dao
+        self.user_dao = user_dao
 
     async def create_room(self, name: str, description: str | None, created_by: str) -> dict:
+        # Checked up front so an unknown creator is a 404 rather than a foreign
+        # key violation surfacing as a 500.
+        if not await self.user_dao.exists(created_by):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"User not found: {created_by}",
+            )
+
         room_id = str(uuid4())
         return await self.room_dao.create(room_id, name, description, created_by)
 
