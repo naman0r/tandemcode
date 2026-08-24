@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.core.config import settings
+from app.core.config import CORS_ORIGINS, RUN_MIGRATIONS_ON_STARTUP
 from app.dao.room_members import RoomMemberDAO
 from app.database import create_pool
 from app.migrate import migrate
@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    if settings.run_migrations_on_startup:
+    if RUN_MIGRATIONS_ON_STARTUP:
         await migrate()
     app.state.db_pool = await create_pool()
     app.state.room_chat_manager = RoomChatManager()
@@ -37,7 +37,7 @@ app = FastAPI(title="TandemCode Backend", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

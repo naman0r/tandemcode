@@ -15,7 +15,7 @@ from pathlib import Path
 
 import asyncpg
 
-from app.core.config import BACKEND_ROOT, settings
+from app.core.config import BACKEND_ROOT, DATABASE_URL
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +130,7 @@ async def apply_migrations(conn: asyncpg.Connection) -> list[Migration]:
 
 
 async def migrate() -> list[Migration]:
-    conn = await asyncpg.connect(dsn=settings.database_url)
+    conn = await asyncpg.connect(dsn=DATABASE_URL)
     try:
         return await apply_migrations(conn)
     finally:
