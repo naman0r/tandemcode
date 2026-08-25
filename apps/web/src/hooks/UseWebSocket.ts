@@ -1,5 +1,6 @@
 // custom hook
 import { useState, useEffect, useRef } from "react";
+import { useAuth } from "@clerk/clerk-react";
 import { useUser } from "../hooks/useUser";
 
 interface ChatMessage {
@@ -21,6 +22,7 @@ const useWebSocket = (roomId: string) => {
   >("disconnected");
 
   const { clerkUser } = useUser();
+  const { getToken } = useAuth();
   const userId = clerkUser?.id;
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -54,70 +56,87 @@ const useWebSocket = (roomId: string) => {
     setConnectionState("connecting");
     setIsConnected(false);
 
-    // create websocket connection
-    const ws = new WebSocket(
-      `ws://localhost:8080/ws/room/${roomId}?userId=${userId}`
-    );
-    wsRef.current = ws;
+    let ws: WebSocket | null = null;
+    let cancelled = false;
 
-    // when the connection opens:
-    ws.onopen = () => {
-      console.log("Connected to room: ", roomId);
-      setIsConnected(true);
-      setConnectionState("connected");
+    // The browser cannot send an Authorization header on a websocket, so the
+    // session token goes in the query string. Fetching it makes this async, and
+    // the effect can be torn down while we wait.
+    const connect = async () => {
+      const token = await getToken();
+      if (cancelled || !token) return;
+
+      ws = new WebSocket(
+        `ws://localhost:8080/ws/room/${roomId}?token=${encodeURIComponent(
+          token
+        )}`
+      );
+      wsRef.current = ws;
+
+      // when the connection opens:
+      ws.onopen = () => {
+        console.log("Connected to room: ", roomId);
+        setIsConnected(true);
+        setConnectionState("connected");
+      };
+
+      // when we receive a message:
+      ws.onmessage = (event) => {
+        console.log("received message", event.data);
+
+        try {
+          // Try to parse as JSON (new format)
+          const messageData = JSON.parse(event.data);
+
+          const newMessage: ChatMessage = {
+            id: Date.now().toString(),
+            text: messageData.text,
+            username:
+              messageData.userId === clerkUser?.id
+                ? "You"
+                : messageData.username,
+            timestamp: new Date(messageData.timestamp),
+            isOwn: messageData.userId === clerkUser?.id,
+          };
+
+          setMessages((prev) => [...prev, newMessage]);
+        } catch (error) {
+          // Fallback for old format (plain text) - for backward compatibility
+          console.log("Received plain text message:", event.data);
+
+          const newMessage: ChatMessage = {
+            id: Date.now().toString(),
+            text: event.data,
+            username: "Other user",
+            timestamp: new Date(),
+            isOwn: false,
+          };
+
+          setMessages((prev) => [...prev, newMessage]);
+        }
+      };
+
+      // when the connection closes:
+      ws.onclose = () => {
+        console.log("Disconnectef from room: ", roomId);
+        setIsConnected(false);
+        setConnectionState("disconnected");
+      };
+
+      // when theres some error lol
+      ws.onerror = (error) => {
+        console.error("WebSocket error", error);
+        setConnectionState("disconnected");
+        setIsConnected(false);
+      };
     };
 
-    // when we receive a message:
-    ws.onmessage = (event) => {
-      console.log("received message", event.data);
-
-      try {
-        // Try to parse as JSON (new format)
-        const messageData = JSON.parse(event.data);
-
-        const newMessage: ChatMessage = {
-          id: Date.now().toString(),
-          text: messageData.text,
-          username:
-            messageData.userId === clerkUser?.id ? "You" : messageData.username,
-          timestamp: new Date(messageData.timestamp),
-          isOwn: messageData.userId === clerkUser?.id,
-        };
-
-        setMessages((prev) => [...prev, newMessage]);
-      } catch (error) {
-        // Fallback for old format (plain text) - for backward compatibility
-        console.log("Received plain text message:", event.data);
-
-        const newMessage: ChatMessage = {
-          id: Date.now().toString(),
-          text: event.data,
-          username: "Other user",
-          timestamp: new Date(),
-          isOwn: false,
-        };
-
-        setMessages((prev) => [...prev, newMessage]);
-      }
-    };
-
-    // when the connection closes:
-    ws.onclose = () => {
-      console.log("Disconnectef from room: ", roomId);
-      setIsConnected(false);
-      setConnectionState("disconnected");
-    };
-
-    // when theres some error lol
-    ws.onerror = (error) => {
-      console.error("WebSocket error", error);
-      setConnectionState("disconnected");
-      setIsConnected(false);
-    };
+    connect();
 
     // cleanup function - runs when the component unmounts
     return () => {
-      ws.close();
+      cancelled = true;
+      ws?.close();
     };
   }, [roomId, userId]); // reconnect when roomId or userId changes
 

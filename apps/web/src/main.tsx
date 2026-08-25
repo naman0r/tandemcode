@@ -13,6 +13,7 @@ import JoinRoom from "./routes/rooms/JoinRoom.tsx";
 import RoomView from "./routes/rooms/RoomView.tsx";
 import CreateRoom from "./routes/rooms/CreateRoom.tsx";
 import Problems from "./routes/Problems.tsx";
+import { ClerkAuthBridge } from "./lib/auth.ts";
 
 // Import your Publishable Key
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -38,6 +39,7 @@ const router = createBrowserRouter([
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+      <ClerkAuthBridge />
       <RouterProvider router={router} />
     </ClerkProvider>
   </StrictMode>

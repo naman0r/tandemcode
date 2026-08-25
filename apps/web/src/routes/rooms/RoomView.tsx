@@ -123,7 +123,6 @@ const RoomView = () => {
       setIsSubmitting(true);
       const submission = await submissionApi.submit({
         roomId,
-        userId: user.id,
         problemId: currentProblem.id,
         language,
         code,
