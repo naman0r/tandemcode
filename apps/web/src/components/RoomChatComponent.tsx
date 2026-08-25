@@ -1,23 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
-import useWebSocket from "../hooks/UseWebSocket";
-
-interface ChatMessage {
-  id: string;
-  text: string;
-  username: string;
-  timestamp: Date;
-  isOwn: boolean;
-}
+import { useRoomSocket } from "../hooks/roomSocketContext";
 
 interface RoomChatComponentProps {
   roomId?: string;
 }
 
 const RoomChatComponent: React.FC<RoomChatComponentProps> = ({ roomId }) => {
-  // Use our WebSocket hook for real-time messaging
-  const { isConnected, messages, sendMessage, connectionState } = useWebSocket(
-    roomId || ""
-  );
+  const { isConnected, messages, sendMessage } = useRoomSocket();
 
   const [newMessage, setNewMessage] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);

@@ -68,6 +68,12 @@ export const roomApi = {
     return response.data;
   },
 
+  // Closes the room if it leaves nobody behind.
+  leaveRoom: async (roomId: string) => {
+    const response = await api.post(`/rooms/${roomId}/leave`);
+    return response.data as { roomClosed: boolean };
+  },
+
   setRoomProblem: async (roomId: string, problemId: string) => {
     const response = await api.patch(`/rooms/${roomId}/problem`, { problemId });
     return response.data;

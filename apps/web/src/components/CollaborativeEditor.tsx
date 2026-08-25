@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useAuth } from "@clerk/clerk-react";
-import Editor, { OnMount } from "@monaco-editor/react";
+import Editor from "@monaco-editor/react";
+import type { OnMount } from "@monaco-editor/react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
