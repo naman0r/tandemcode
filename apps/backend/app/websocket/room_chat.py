@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 from collections import defaultdict
 
@@ -20,27 +21,32 @@ class RoomChatManager:
     """
 
     def __init__(self) -> None:
-        self.room_sessions: dict[str, dict[WebSocket, str | None]] = defaultdict(dict)
+        self.room_sessions: dict[str, dict[WebSocket, str]] = defaultdict(dict)
 
     async def join(
         self,
         websocket: WebSocket,
         room_id: str,
-        user_id: str | None,
+        user_id: str,
         room_member_dao: RoomMemberDAO,
     ) -> None:
-        # Presence is written before the handshake completes, so a GET /members
-        # issued the moment the socket opens already sees this user.
-        if user_id:
-            try:
-                await room_member_dao.add_member(room_id, user_id)
-            except Exception:
-                logger.exception(
-                    "Failed to add room member user_id=%s room_id=%s", user_id, room_id
-                )
+        # Both writes land before the handshake completes: a GET /members issued
+        # the moment the socket opens already sees this user, and an accept()
+        # that fails still unwinds through leave() rather than stranding the
+        # presence row. Chat is worth having even if the presence write fails,
+        # hence the log-and-continue.
+        try:
+            await room_member_dao.add_member(room_id, user_id)
+        except Exception:
+            logger.exception(
+                "Failed to add room member user_id=%s room_id=%s", user_id, room_id
+            )
 
-        await websocket.accept()
         self.room_sessions[room_id][websocket] = user_id
+        await websocket.accept()
+
+        # After accept so the joiner is in the roster it receives.
+        await self._broadcast_presence(room_id, room_member_dao)
 
     async def leave(
         self,
@@ -64,6 +70,27 @@ class RoomChatManager:
                 logger.exception(
                     "Failed to remove room member user_id=%s room_id=%s", user_id, room_id
                 )
+
+        await self._broadcast_presence(room_id, room_member_dao)
+
+    async def _broadcast_presence(
+        self,
+        room_id: str,
+        room_member_dao: RoomMemberDAO,
+    ) -> None:
+        """Push the whole roster rather than a delta, so a client that missed an
+        event still converges on the next one."""
+        try:
+            members = await room_member_dao.list_members(room_id)
+        except Exception:
+            logger.exception("Failed to read members for room %s", room_id)
+            return
+
+        # default=str renders joined_at, which is a datetime.
+        await self.broadcast(
+            room_id,
+            json.dumps({"type": "presence", "members": members}, default=str),
+        )
 
     async def broadcast(self, room_id: str, message: str) -> None:
         for session in list(self.room_sessions.get(room_id, {})):

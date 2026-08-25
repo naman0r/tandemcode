@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getSessionToken } from "./auth";
 
 const API_BASE_URL = "http://localhost:8080/api";
 
@@ -9,9 +10,19 @@ export const api = axios.create({
   },
 });
 
+// Every /api route requires a Clerk session token. Attaching it here means no
+// call site has to remember to.
+api.interceptors.request.use(async (config) => {
+  const token = await getSessionToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export const userApi = {
   // create user (called when Clerk user signs up)
-  createUser: async (userData: { id: string; email: string; name: string }) => {
+  createUser: async (userData: { email: string; name: string }) => {
     const response = await api.post("/users", userData);
     return response.data;
   },
@@ -41,11 +52,7 @@ export const roomApi = {
   },
 
   // creatw a new room:
-  createRoom: async (roomData: {
-    name: string;
-    description: string;
-    createdBy: string;
-  }) => {
+  createRoom: async (roomData: { name: string; description: string }) => {
     const response = await api.post("/rooms", roomData);
     return response.data;
   },
@@ -59,6 +66,12 @@ export const roomApi = {
   getMembersInRoom: async (roomId: string) => {
     const response = await api.get(`/rooms/${roomId}/members`);
     return response.data;
+  },
+
+  // Closes the room if it leaves nobody behind.
+  leaveRoom: async (roomId: string) => {
+    const response = await api.post(`/rooms/${roomId}/leave`);
+    return response.data as { roomClosed: boolean };
   },
 
   setRoomProblem: async (roomId: string, problemId: string) => {
@@ -88,7 +101,6 @@ export const problemApi = {
 export const submissionApi = {
   submit: async (data: {
     roomId: string;
-    userId: string;
     problemId: string;
     language: string;
     code: string;

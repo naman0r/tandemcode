@@ -8,7 +8,6 @@ from pydantic import BaseModel
 
 class SubmitRequest(BaseModel):
     roomId: str
-    userId: str
     problemId: UUID
     language: str
     code: str

@@ -63,6 +63,11 @@ class RoomDAO:
             rows = await conn.fetch(query, user_id)
         return [_map_room(row) for row in rows]
 
+    async def deactivate(self, room_id: str) -> None:
+        query = "UPDATE rooms SET is_active = FALSE WHERE id = $1"
+        async with self.pool.acquire() as conn:
+            await conn.execute(query, room_id)
+
     async def exists(self, room_id: str) -> bool:
         query = "SELECT EXISTS(SELECT 1 FROM rooms WHERE id = $1)"
         async with self.pool.acquire() as conn:

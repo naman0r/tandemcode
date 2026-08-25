@@ -14,6 +14,7 @@ from app.routes.problems import router as problems_router
 from app.routes.rooms import router as rooms_router
 from app.routes.submissions import router as submissions_router
 from app.routes.users import router as users_router
+from app.websocket.auth import authenticate
 from app.websocket.room_chat import RoomChatManager
 from app.websocket.yjs import YjsRelayManager
 
@@ -56,13 +57,17 @@ async def healthcheck() -> dict[str, str]:
 
 @app.websocket("/ws/room/{room_id}")
 async def room_websocket(websocket: WebSocket, room_id: str) -> None:
+    user_id = await authenticate(websocket, room_id)
+    if user_id is None:
+        return
+
     manager: RoomChatManager = websocket.app.state.room_chat_manager
     room_member_dao = RoomMemberDAO(websocket.app.state.db_pool)
-    user_id = websocket.query_params.get("userId")
 
-    await manager.join(websocket, room_id, user_id, room_member_dao)
-
+    # join() is inside the try so that an accept() which fails still unwinds
+    # through leave() and takes the presence row with it.
     try:
+        await manager.join(websocket, room_id, user_id, room_member_dao)
         while True:
             message = await websocket.receive_text()
             await manager.broadcast(room_id, message)
@@ -74,6 +79,9 @@ async def room_websocket(websocket: WebSocket, room_id: str) -> None:
 
 @app.websocket("/ws/yjs/{room_id}")
 async def yjs_websocket(websocket: WebSocket, room_id: str) -> None:
+    if await authenticate(websocket, room_id) is None:
+        return
+
     manager: YjsRelayManager = websocket.app.state.yjs_relay_manager
     await manager.connect(websocket, room_id)
 

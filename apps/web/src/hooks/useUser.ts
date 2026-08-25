@@ -40,7 +40,6 @@ export function useUser() {
 
         // Create new user in backend
         const userData = {
-          id: clerkUser.id,
           email: clerkUser.primaryEmailAddress?.emailAddress || "",
           name: clerkUser.fullName || clerkUser.firstName || "Unknown User",
         };

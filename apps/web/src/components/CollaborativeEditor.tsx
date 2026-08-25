@@ -1,5 +1,7 @@
 import { useEffect, useRef } from "react";
-import Editor, { OnMount } from "@monaco-editor/react";
+import { useAuth } from "@clerk/clerk-react";
+import Editor from "@monaco-editor/react";
+import type { OnMount } from "@monaco-editor/react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
@@ -18,7 +20,18 @@ const MONACO_LANGUAGE: Record<string, string> = {
 
 const WS_URL = "ws://localhost:8080/ws/yjs";
 
+// Clerk session tokens last about a minute. y-websocket re-reads provider.params
+// every time it dials, so refreshing well inside that window is what lets a
+// dropped connection come back instead of failing the handshake forever.
+const TOKEN_REFRESH_MS = 30_000;
+
 const CollaborativeEditor = ({ roomId, language, onCodeChange }: Props) => {
+  const { getToken } = useAuth();
+  // Held in a ref so that a fresh getToken identity from Clerk cannot re-run the
+  // effect below and tear down the shared document mid-session.
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+
   const editorRef = useRef<any>(null);
   const monacoRef = useRef<any>(null);
   const ydocRef = useRef<Y.Doc | null>(null);
@@ -48,25 +61,49 @@ const CollaborativeEditor = ({ roomId, language, onCodeChange }: Props) => {
   };
 
   // Initialize the Yjs doc and WebSocket provider once per roomId.
-  // y-websocket connects to our Spring Boot relay at /ws/yjs/{roomId},
-  // which forwards binary Yjs messages to all other sessions in the room.
+  // y-websocket connects to our relay at /ws/yjs/{roomId}, which forwards
+  // binary Yjs messages to all other sessions in the room. The relay rejects
+  // the handshake without a valid session token, which is why the connection
+  // cannot be opened until getToken resolves.
   useEffect(() => {
     const ydoc = new Y.Doc();
-    const provider = new WebsocketProvider(WS_URL, roomId, ydoc);
     ydocRef.current = ydoc;
-    providerRef.current = provider;
 
-    // StrictMode re-run: editor is already mounted, recreate binding now.
-    if (editorRef.current) {
-      createBinding(ydoc, provider, editorRef.current);
-    }
+    let cancelled = false;
+    let refresh: ReturnType<typeof setInterval> | undefined;
+
+    const connect = async () => {
+      const token = await getTokenRef.current();
+      if (cancelled || !token) return;
+
+      const provider = new WebsocketProvider(WS_URL, roomId, ydoc, {
+        params: { token },
+      });
+      providerRef.current = provider;
+
+      refresh = setInterval(async () => {
+        const next = await getTokenRef.current();
+        if (next) {
+          provider.params.token = next;
+        }
+      }, TOKEN_REFRESH_MS);
+
+      // StrictMode re-run: editor is already mounted, recreate binding now.
+      if (editorRef.current) {
+        createBinding(ydoc, provider, editorRef.current);
+      }
+    };
+
+    connect();
 
     return () => {
+      cancelled = true;
+      clearInterval(refresh);
       bindingRef.current?.destroy();
       bindingRef.current = null;
-      provider.destroy();
-      ydoc.destroy();
+      providerRef.current?.destroy();
       providerRef.current = null;
+      ydoc.destroy();
       ydocRef.current = null;
     };
   }, [roomId]);

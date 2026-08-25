@@ -36,9 +36,11 @@ class RoomMemberDAO:
 
     async def list_members(self, room_id: str) -> list[dict]:
         query = """
-            SELECT rm.user_id, u.name, u.email, rm.role, rm.joined_at
+            SELECT rm.user_id, u.name, u.email, rm.joined_at,
+                   CASE WHEN r.created_by = rm.user_id THEN 'owner' ELSE 'participant' END AS role
             FROM room_members rm
             JOIN users u ON u.id = rm.user_id
+            JOIN rooms r ON r.id = rm.room_id
             WHERE rm.room_id = $1
             ORDER BY rm.joined_at ASC
         """

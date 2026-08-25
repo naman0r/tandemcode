@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
@@ -7,7 +7,8 @@ import RoomChatComponent from "../../components/RoomChatComponent";
 import RoomMembersPanel from "../../components/RoomMembersPanel";
 import CollaborativeEditor from "../../components/CollaborativeEditor";
 import { roomApi, problemApi, submissionApi } from "../../lib/api";
-import useWebSocket from "../../hooks/UseWebSocket";
+import { RoomSocketProvider } from "../../hooks/RoomSocketProvider";
+import { useRoomSocket } from "../../hooks/roomSocketContext";
 
 type Problem = {
   id: string;
@@ -39,7 +40,51 @@ const STATUS_COLORS: Record<string, string> = {
   error: "text-red-600 bg-red-50",
 };
 
-const RoomView = () => {
+const ConnectionStatus = () => {
+  const { isConnected } = useRoomSocket();
+  return (
+    <div className="flex items-center space-x-2 text-sm">
+      <div
+        className={`w-2 h-2 rounded-full ${
+          isConnected ? "bg-green-500" : "bg-red-500"
+        }`}
+      />
+      <span className="text-gray-600">
+        {isConnected ? "Connected" : "Connecting..."}
+      </span>
+    </div>
+  );
+};
+
+const LeaveRoomButton = ({ roomId }: { roomId: string }) => {
+  const navigate = useNavigate();
+  const [leaving, setLeaving] = useState(false);
+
+  const handleLeave = async () => {
+    setLeaving(true);
+    try {
+      await roomApi.leaveRoom(roomId);
+    } catch (err) {
+      console.error("Failed to leave room:", err);
+    } finally {
+      // Navigating unmounts the provider, which closes the socket and lets the
+      // server tell everyone still here that we have gone.
+      navigate("/rooms");
+    }
+  };
+
+  return (
+    <button
+      onClick={handleLeave}
+      disabled={leaving}
+      className="bg-red-50 text-red-700 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors border border-red-200 text-sm disabled:opacity-50"
+    >
+      {leaving ? "Leaving..." : "Leave room"}
+    </button>
+  );
+};
+
+const RoomViewContent = () => {
   const { roomId } = useParams();
   const { user } = useUser();
 
@@ -54,8 +99,6 @@ const RoomView = () => {
   const [availableProblems, setAvailableProblems] = useState<Problem[]>([]);
   const [loadingProblems, setLoadingProblems] = useState(false);
 
-  const { connectionState } = useWebSocket(roomId || "");
-  const isConnected = connectionState === "connected";
   const isRoomCreator = roomData?.createdBy === user?.id;
 
   // Fetch room data
@@ -123,7 +166,6 @@ const RoomView = () => {
       setIsSubmitting(true);
       const submission = await submissionApi.submit({
         roomId,
-        userId: user.id,
         problemId: currentProblem.id,
         language,
         code,
@@ -181,16 +223,7 @@ const RoomView = () => {
               <span className="text-gray-300">|</span>
               <span className="text-gray-900 font-medium">{roomData?.name}</span>
             </nav>
-            <div className="flex items-center space-x-2 text-sm">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  isConnected ? "bg-green-500" : "bg-red-500"
-                }`}
-              />
-              <span className="text-gray-600">
-                {isConnected ? "Connected" : "Connecting..."}
-              </span>
-            </div>
+            <ConnectionStatus />
           </div>
         </div>
       </div>
@@ -217,9 +250,7 @@ const RoomView = () => {
               >
                 Copy room ID
               </button>
-              <button className="bg-red-50 text-red-700 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors border border-red-200 text-sm">
-                Leave room
-              </button>
+              <LeaveRoomButton roomId={roomId || ""} />
             </div>
           </div>
         </div>
@@ -334,7 +365,7 @@ const RoomView = () => {
 
           {/* Right Column */}
           <div className="space-y-6">
-            <RoomMembersPanel roomId={roomId || ""} />
+            <RoomMembersPanel />
             <div className="h-96">
               <RoomChatComponent roomId={roomId} />
             </div>
@@ -394,6 +425,16 @@ const RoomView = () => {
 
       <Footer />
     </div>
+  );
+};
+
+const RoomView = () => {
+  const { roomId } = useParams();
+
+  return (
+    <RoomSocketProvider roomId={roomId || ""}>
+      <RoomViewContent />
+    </RoomSocketProvider>
   );
 };
 

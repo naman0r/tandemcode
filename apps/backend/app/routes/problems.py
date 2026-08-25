@@ -4,11 +4,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
-from app.dependencies import get_problem_service
+from app.dependencies import current_user_id, get_problem_service
 from app.schemas.problems import CreateProblemRequest, ProblemResponse
 from app.services.problems import ProblemService
 
-router = APIRouter(prefix="/api/problems", tags=["problems"])
+# Declared on the router so a route added later cannot quietly skip it.
+router = APIRouter(
+    prefix="/api/problems",
+    tags=["problems"],
+    dependencies=[Depends(current_user_id)],
+)
 
 
 @router.get("", response_model=list[ProblemResponse])

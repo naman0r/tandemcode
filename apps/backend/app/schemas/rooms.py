@@ -9,11 +9,14 @@ from pydantic import BaseModel
 class CreateRoomRequest(BaseModel):
     name: str
     description: str | None = None
-    createdBy: str
 
 
 class SetProblemRequest(BaseModel):
     problemId: UUID
+
+
+class LeaveRoomResponse(BaseModel):
+    roomClosed: bool
 
 
 class RoomResponse(BaseModel):
