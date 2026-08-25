@@ -15,6 +15,10 @@ class SetProblemRequest(BaseModel):
     problemId: UUID
 
 
+class LeaveRoomResponse(BaseModel):
+    roomClosed: bool
+
+
 class RoomResponse(BaseModel):
     id: str
     name: str

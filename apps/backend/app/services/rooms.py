@@ -37,6 +37,21 @@ async def ensure_room_access(room_dao: RoomDAO, room_id: str, user_id: str) -> d
     return room
 
 
+async def ensure_room_owner(room_dao: RoomDAO, room_id: str, user_id: str) -> dict:
+    """Return the room if `user_id` created it, otherwise raise.
+
+    Ownership is `rooms.created_by` and nothing else. The `role` column on
+    room_members is not consulted, so the two cannot disagree.
+    """
+    room = await ensure_room_access(room_dao, room_id, user_id)
+    if room["createdBy"] != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the room owner can do that",
+        )
+    return room
+
+
 class RoomService:
     def __init__(
         self,
@@ -77,7 +92,7 @@ class RoomService:
         return await self.room_member_dao.list_members(room_id)
 
     async def set_current_problem(self, room_id: str, problem_id, caller_id: str) -> dict:
-        await ensure_room_access(self.room_dao, room_id, caller_id)
+        await ensure_room_owner(self.room_dao, room_id, caller_id)
 
         if not await self.problem_dao.exists(problem_id):
             raise HTTPException(
@@ -92,3 +107,22 @@ class RoomService:
                 detail=f"Room not found: {room_id}",
             )
         return updated_room
+
+    async def leave_room(self, room_id: str, user_id: str) -> dict:
+        """Drop the caller's presence, and close the room if that empties it.
+
+        Closing is `is_active = false`, not a DELETE. Submissions and events
+        reference the room and are the raw material for the session history we
+        want to show people later, so the row has to survive.
+
+        Only an explicit leave can close a room. Disconnecting does not, or a
+        refresh or a flaky network would destroy a room out from under someone.
+        """
+        await ensure_room_access(self.room_dao, room_id, user_id)
+        await self.room_member_dao.remove_member(room_id, user_id)
+
+        if await self.room_member_dao.list_members(room_id):
+            return {"roomClosed": False}
+
+        await self.room_dao.deactivate(room_id)
+        return {"roomClosed": True}

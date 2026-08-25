@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from app.dependencies import current_user_id, get_room_service
 from app.schemas.rooms import (
     CreateRoomRequest,
+    LeaveRoomResponse,
     RoomResponse,
     SetProblemRequest,
     UserInRoomResponse,
@@ -54,6 +55,15 @@ async def list_room_members(
 ) -> list[UserInRoomResponse]:
     members = await service.list_room_members(room_id, caller_id)
     return [UserInRoomResponse.model_validate(member) for member in members]
+
+
+@router.post("/{room_id}/leave", response_model=LeaveRoomResponse)
+async def leave_room(
+    room_id: str,
+    caller_id: str = Depends(current_user_id),
+    service: RoomService = Depends(get_room_service),
+) -> LeaveRoomResponse:
+    return LeaveRoomResponse.model_validate(await service.leave_room(room_id, caller_id))
 
 
 @router.patch("/{room_id}/problem", response_model=RoomResponse)
