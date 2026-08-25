@@ -50,3 +50,16 @@ RUN_MIGRATIONS_ON_STARTUP = os.getenv("RUN_MIGRATIONS_ON_STARTUP", "true").lower
     "true",
     "yes",
 }
+
+# The Clerk instance that issues session tokens, e.g.
+# https://your-app-42.clerk.accounts.dev. Required: a backend that cannot check
+# tokens has no business starting.
+CLERK_ISSUER = _required("CLERK_ISSUER").rstrip("/")
+
+# Clerk stamps the requesting origin into each token's `azp` claim. Our own
+# origins are the right default, since the browser app is the only client.
+CLERK_AUTHORIZED_PARTIES = [
+    party.strip()
+    for party in os.getenv("CLERK_AUTHORIZED_PARTIES", ",".join(CORS_ORIGINS)).split(",")
+    if party.strip()
+]
