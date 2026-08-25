@@ -20,27 +20,29 @@ class RoomChatManager:
     """
 
     def __init__(self) -> None:
-        self.room_sessions: dict[str, dict[WebSocket, str | None]] = defaultdict(dict)
+        self.room_sessions: dict[str, dict[WebSocket, str]] = defaultdict(dict)
 
     async def join(
         self,
         websocket: WebSocket,
         room_id: str,
-        user_id: str | None,
+        user_id: str,
         room_member_dao: RoomMemberDAO,
     ) -> None:
-        # Presence is written before the handshake completes, so a GET /members
-        # issued the moment the socket opens already sees this user.
-        if user_id:
-            try:
-                await room_member_dao.add_member(room_id, user_id)
-            except Exception:
-                logger.exception(
-                    "Failed to add room member user_id=%s room_id=%s", user_id, room_id
-                )
+        # Both writes land before the handshake completes: a GET /members issued
+        # the moment the socket opens already sees this user, and an accept()
+        # that fails still unwinds through leave() rather than stranding the
+        # presence row. Chat is worth having even if the presence write fails,
+        # hence the log-and-continue.
+        try:
+            await room_member_dao.add_member(room_id, user_id)
+        except Exception:
+            logger.exception(
+                "Failed to add room member user_id=%s room_id=%s", user_id, room_id
+            )
 
-        await websocket.accept()
         self.room_sessions[room_id][websocket] = user_id
+        await websocket.accept()
 
     async def leave(
         self,
