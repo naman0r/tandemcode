@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
-from app.dependencies import get_room_service
+from app.dependencies import current_user_id, get_room_service
 from app.schemas.rooms import (
     CreateRoomRequest,
     RoomResponse,
@@ -11,15 +11,21 @@ from app.schemas.rooms import (
 )
 from app.services.rooms import RoomService
 
-router = APIRouter(prefix="/api/rooms", tags=["rooms"])
+# Declared on the router so a route added later cannot quietly skip it.
+router = APIRouter(
+    prefix="/api/rooms",
+    tags=["rooms"],
+    dependencies=[Depends(current_user_id)],
+)
 
 
 @router.post("", response_model=RoomResponse)
 async def create_room(
     payload: CreateRoomRequest,
+    user_id: str = Depends(current_user_id),
     service: RoomService = Depends(get_room_service),
 ) -> RoomResponse:
-    room = await service.create_room(payload.name, payload.description, payload.createdBy)
+    room = await service.create_room(payload.name, payload.description, user_id)
     return RoomResponse.model_validate(room)
 
 
@@ -43,9 +49,10 @@ async def list_rooms_by_creator(
 @router.get("/{room_id}/members", response_model=list[UserInRoomResponse])
 async def list_room_members(
     room_id: str,
+    caller_id: str = Depends(current_user_id),
     service: RoomService = Depends(get_room_service),
 ) -> list[UserInRoomResponse]:
-    members = await service.list_room_members(room_id)
+    members = await service.list_room_members(room_id, caller_id)
     return [UserInRoomResponse.model_validate(member) for member in members]
 
 
@@ -53,16 +60,18 @@ async def list_room_members(
 async def set_current_problem(
     room_id: str,
     payload: SetProblemRequest,
+    caller_id: str = Depends(current_user_id),
     service: RoomService = Depends(get_room_service),
 ) -> RoomResponse:
-    room = await service.set_current_problem(room_id, payload.problemId)
+    room = await service.set_current_problem(room_id, payload.problemId, caller_id)
     return RoomResponse.model_validate(room)
 
 
 @router.get("/{room_id}", response_model=RoomResponse)
 async def get_room(
     room_id: str,
+    caller_id: str = Depends(current_user_id),
     service: RoomService = Depends(get_room_service),
 ) -> RoomResponse:
-    room = await service.get_room(room_id)
+    room = await service.get_room(room_id, caller_id)
     return RoomResponse.model_validate(room)
