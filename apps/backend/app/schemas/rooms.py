@@ -32,6 +32,5 @@ class RoomResponse(BaseModel):
 class UserInRoomResponse(BaseModel):
     userId: str
     name: str | None
-    email: str
     role: str
     joinedAt: datetime

@@ -1,0 +1,164 @@
+"""Presence, ownership, chat identity and room closure."""
+
+from __future__ import annotations
+
+import pytest
+from starlette.websockets import WebSocketDisconnect
+
+from tests.rig import (
+    auth,
+    close_socket,
+    next_chat,
+    room_socket as connect,
+    roster,
+    wait_for_roster,
+)
+
+
+def test_creator_is_owner_and_others_are_participants(client, room):
+    with connect(client, room["id"], "user_alice") as alice:
+        assert roster(alice) == [("user_alice", "owner")]
+
+        with connect(client, room["id"], "user_bob") as bob:
+            assert roster(bob) == [
+                ("user_alice", "owner"),
+                ("user_bob", "participant"),
+            ]
+            # The member already in the room is told, without asking.
+            assert roster(alice) == [
+                ("user_alice", "owner"),
+                ("user_bob", "participant"),
+            ]
+
+            close_socket(bob)
+            # And is told again when he goes.
+            assert roster(alice) == [("user_alice", "owner")]
+
+
+def test_presence_survives_a_second_tab_closing(client, room):
+    with connect(client, room["id"], "user_alice") as first:
+        roster(first)
+        with connect(client, room["id"], "user_alice") as second:
+            roster(second)
+            roster(first)
+
+            close_socket(second)
+            # One socket of theirs is gone, but the user is not.
+            assert roster(first) == [("user_alice", "owner")]
+
+
+def test_chat_is_attributed_to_the_authenticated_sender(client, room):
+    with connect(client, room["id"], "user_alice") as alice:
+        roster(alice)
+        with connect(client, room["id"], "user_bob") as bob:
+            roster(alice)
+            roster(bob)
+
+            bob.send_json(
+                {
+                    "type": "chat",
+                    "text": "hello",
+                    "userId": "user_alice",
+                    "username": "Alice",
+                    "timestamp": "1999-01-01T00:00:00Z",
+                }
+            )
+
+            event = next_chat(alice)
+
+    assert event["userId"] == "user_bob", "sender was taken from the payload"
+    assert event["username"] == "Bob"
+    assert event["text"] == "hello"
+    assert not event["timestamp"].startswith("1999")
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [{"type": "chat"}, {"type": "chat", "text": "   "}, {"type": "nonsense", "text": "x"}],
+    ids=["no-text", "blank-text", "unknown-type"],
+)
+def test_junk_frames_are_not_relayed(client, room, payload):
+    with connect(client, room["id"], "user_alice") as alice:
+        roster(alice)
+        with connect(client, room["id"], "user_bob") as bob:
+            roster(alice)
+            roster(bob)
+            bob.send_json(payload)
+            bob.send_json({"type": "chat", "text": "real"})
+
+            # The junk frame would have arrived first had it been relayed.
+            assert next_chat(alice)["text"] == "real"
+
+
+def test_only_the_owner_can_set_the_problem(client, room):
+    problem_id = client.get("/api/problems", headers=auth("user_alice")).json()[0]["id"]
+    url = f"/api/rooms/{room['id']}/problem"
+
+    assert client.patch(url, json={"problemId": problem_id}, headers=auth("user_bob")).status_code == 403
+    assert client.patch(url, json={"problemId": problem_id}, headers=auth("user_alice")).status_code == 200
+
+
+def test_a_non_member_cannot_leave(client, room):
+    with connect(client, room["id"], "user_alice") as alice:
+        roster(alice)
+        response = client.post(f"/api/rooms/{room['id']}/leave", headers=auth("user_bob"))
+        assert response.status_code == 403
+        assert response.json()["detail"] == "You are not in this room"
+
+    assert client.get(f"/api/rooms/{room['id']}", headers=auth("user_alice")).status_code == 200
+
+
+def test_leaving_an_empty_room_closes_it_without_losing_data(client, room):
+    problem_id = client.get("/api/problems", headers=auth("user_alice")).json()[0]["id"]
+    client.post(
+        "/api/submissions",
+        json={
+            "roomId": room["id"],
+            "problemId": problem_id,
+            "language": "python",
+            "code": "print(1)",
+        },
+        headers=auth("user_alice"),
+    )
+
+    with connect(client, room["id"], "user_alice"):
+        assert client.post(
+            f"/api/rooms/{room['id']}/leave", headers=auth("user_alice")
+        ).json() == {"roomClosed": True}
+
+    assert client.get(f"/api/rooms/{room['id']}", headers=auth("user_alice")).status_code == 403
+    assert room["id"] not in [r["id"] for r in client.get("/api/rooms", headers=auth("user_alice")).json()]
+
+
+def test_a_closed_room_refuses_new_sockets(client, room):
+    """The join path checks room state under the same lock that closes it."""
+    with connect(client, room["id"], "user_alice"):
+        client.post(f"/api/rooms/{room['id']}/leave", headers=auth("user_alice"))
+
+    with pytest.raises(WebSocketDisconnect):
+        with connect(client, room["id"], "user_alice"):
+            pass
+
+
+def test_leaving_closes_every_tab_for_that_user(client, room):
+    with connect(client, room["id"], "user_alice") as first:
+        with connect(client, room["id"], "user_alice") as second:
+            roster(first)
+            roster(second)
+
+            response = client.post(
+                f"/api/rooms/{room['id']}/leave", headers=auth("user_alice")
+            )
+            assert response.json() == {"roomClosed": True}
+
+    assert client.get(f"/api/rooms/{room['id']}", headers=auth("user_alice")).status_code == 403
+
+
+def test_disconnecting_never_closes_a_room(client, room):
+    """Only an explicit leave closes a room; a refresh must not destroy it."""
+    with connect(client, room["id"], "user_alice") as alice:
+        roster(alice)
+        close_socket(alice)
+        wait_for_roster(client, room["id"], [])
+
+    assert client.get(f"/api/rooms/{room['id']}", headers=auth("user_alice")).status_code == 200

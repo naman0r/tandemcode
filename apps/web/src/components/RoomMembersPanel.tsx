@@ -1,9 +1,14 @@
-import { useRoomSocket } from "../hooks/roomSocketContext";
-import { useUser } from "../hooks/useUser";
+import { useUser as useClerkUser } from "@clerk/clerk-react";
+import type { ConnectionState, RoomMember } from "../hooks/UseWebSocket";
 
-const RoomMembersPanel = () => {
-  const { members, connectionState } = useRoomSocket();
-  const { clerkUser } = useUser();
+const RoomMembersPanel = ({
+  members,
+  connectionState,
+}: {
+  members: RoomMember[];
+  connectionState: ConnectionState;
+}) => {
+  const { user: clerkUser } = useClerkUser();
 
   // Membership is presence: the server pushes the roster whenever anyone joins
   // or leaves, so everyone listed is connected right now.
@@ -28,7 +33,7 @@ const RoomMembersPanel = () => {
                 {profileImage ? (
                   <img
                     src={profileImage}
-                    alt={member.name}
+                    alt={member.name ?? "Member"}
                     className="w-8 h-8 rounded-full object-cover"
                   />
                 ) : (

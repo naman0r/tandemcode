@@ -56,6 +56,10 @@ RUN_MIGRATIONS_ON_STARTUP = os.getenv("RUN_MIGRATIONS_ON_STARTUP", "true").lower
 # tokens has no business starting.
 CLERK_ISSUER = _required("CLERK_ISSUER").rstrip("/")
 
+# Server-side Clerk credential, used to read user profiles. A real secret:
+# it must never reach the browser.
+CLERK_SECRET_KEY = _required("CLERK_SECRET_KEY")
+
 # Clerk stamps the requesting origin into each token's `azp` claim. Our own
 # origins are the right default, since the browser app is the only client.
 CLERK_AUTHORIZED_PARTIES = [

@@ -5,6 +5,7 @@ import type { OnMount } from "@monaco-editor/react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
+import { WS_BASE_URL } from "../lib/config";
 
 interface Props {
   roomId: string;
@@ -18,7 +19,10 @@ const MONACO_LANGUAGE: Record<string, string> = {
   java: "java",
 };
 
-const WS_URL = "ws://localhost:8080/ws/yjs";
+const WS_URL = `${WS_BASE_URL}/ws/yjs`;
+
+type MonacoEditor = Parameters<OnMount>[0];
+type Monaco = Parameters<OnMount>[1];
 
 // Clerk session tokens last about a minute. y-websocket re-reads provider.params
 // every time it dials, so refreshing well inside that window is what lets a
@@ -26,14 +30,14 @@ const WS_URL = "ws://localhost:8080/ws/yjs";
 const TOKEN_REFRESH_MS = 30_000;
 
 const CollaborativeEditor = ({ roomId, language, onCodeChange }: Props) => {
-  const { getToken } = useAuth();
+  const { getToken, isLoaded, isSignedIn, sessionId } = useAuth();
   // Held in a ref so that a fresh getToken identity from Clerk cannot re-run the
   // effect below and tear down the shared document mid-session.
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
 
-  const editorRef = useRef<any>(null);
-  const monacoRef = useRef<any>(null);
+  const editorRef = useRef<MonacoEditor | null>(null);
+  const monacoRef = useRef<Monaco | null>(null);
   const ydocRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
   const bindingRef = useRef<MonacoBinding | null>(null);
@@ -47,7 +51,7 @@ const CollaborativeEditor = ({ roomId, language, onCodeChange }: Props) => {
   const createBinding = (
     ydoc: Y.Doc,
     provider: WebsocketProvider,
-    editor: any
+    editor: MonacoEditor
   ) => {
     bindingRef.current?.destroy();
     const ytext = ydoc.getText("code");
@@ -66,6 +70,8 @@ const CollaborativeEditor = ({ roomId, language, onCodeChange }: Props) => {
   // the handshake without a valid session token, which is why the connection
   // cannot be opened until getToken resolves.
   useEffect(() => {
+    if (!roomId || !isLoaded || !isSignedIn) return;
+
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
 
@@ -106,7 +112,7 @@ const CollaborativeEditor = ({ roomId, language, onCodeChange }: Props) => {
       ydoc.destroy();
       ydocRef.current = null;
     };
-  }, [roomId]);
+  }, [roomId, isLoaded, isSignedIn, sessionId]);
 
   // Keep Monaco syntax highlighting in sync with the language selector
   // without recreating the model (which would break the Yjs binding).

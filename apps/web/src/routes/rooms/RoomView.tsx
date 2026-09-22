@@ -7,8 +7,7 @@ import RoomChatComponent from "../../components/RoomChatComponent";
 import RoomMembersPanel from "../../components/RoomMembersPanel";
 import CollaborativeEditor from "../../components/CollaborativeEditor";
 import { roomApi, problemApi, submissionApi } from "../../lib/api";
-import { RoomSocketProvider } from "../../hooks/RoomSocketProvider";
-import { useRoomSocket } from "../../hooks/roomSocketContext";
+import useWebSocket from "../../hooks/UseWebSocket";
 
 type Problem = {
   id: string;
@@ -26,6 +25,14 @@ type Submission = {
   createdAt: string;
 };
 
+type Room = {
+  id: string;
+  name: string;
+  description: string | null;
+  createdBy: string;
+  currentProblemId: string | null;
+};
+
 const DIFFICULTY_COLORS: Record<string, string> = {
   easy: "text-green-600 bg-green-50 border-green-200",
   medium: "text-yellow-600 bg-yellow-50 border-yellow-200",
@@ -40,22 +47,6 @@ const STATUS_COLORS: Record<string, string> = {
   error: "text-red-600 bg-red-50",
 };
 
-const ConnectionStatus = () => {
-  const { isConnected } = useRoomSocket();
-  return (
-    <div className="flex items-center space-x-2 text-sm">
-      <div
-        className={`w-2 h-2 rounded-full ${
-          isConnected ? "bg-green-500" : "bg-red-500"
-        }`}
-      />
-      <span className="text-gray-600">
-        {isConnected ? "Connected" : "Connecting..."}
-      </span>
-    </div>
-  );
-};
-
 const LeaveRoomButton = ({ roomId }: { roomId: string }) => {
   const navigate = useNavigate();
   const [leaving, setLeaving] = useState(false);
@@ -65,12 +56,15 @@ const LeaveRoomButton = ({ roomId }: { roomId: string }) => {
     try {
       await roomApi.leaveRoom(roomId);
     } catch (err) {
+      // Staying put matters: navigating anyway would close the socket while the
+      // room is still marked active and nobody is in it.
       console.error("Failed to leave room:", err);
-    } finally {
-      // Navigating unmounts the provider, which closes the socket and lets the
-      // server tell everyone still here that we have gone.
-      navigate("/rooms");
+      setLeaving(false);
+      return;
     }
+    // Navigating unmounts the hook, which closes the socket and lets the server
+    // tell everyone still here that we have gone.
+    navigate("/rooms");
   };
 
   return (
@@ -84,11 +78,11 @@ const LeaveRoomButton = ({ roomId }: { roomId: string }) => {
   );
 };
 
-const RoomViewContent = () => {
+const RoomView = () => {
   const { roomId } = useParams();
   const { user } = useUser();
 
-  const [roomData, setRoomData] = useState<any>(null);
+  const [roomData, setRoomData] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentProblem, setCurrentProblem] = useState<Problem | null>(null);
   const [code, setCode] = useState("# Write your solution here\n");
@@ -99,6 +93,8 @@ const RoomViewContent = () => {
   const [availableProblems, setAvailableProblems] = useState<Problem[]>([]);
   const [loadingProblems, setLoadingProblems] = useState(false);
 
+  const { isConnected, connectionState, messages, members, sendMessage } =
+    useWebSocket(roomId || "");
   const isRoomCreator = roomData?.createdBy === user?.id;
 
   // Fetch room data
@@ -112,9 +108,11 @@ const RoomViewContent = () => {
       } catch (err) {
         console.error("Error fetching room:", err);
         setRoomData({
+          id: "",
           name: "Room not found",
           description: "This room may have been deleted.",
           createdBy: "",
+          currentProblemId: null,
         });
       } finally {
         setLoading(false);
@@ -223,7 +221,16 @@ const RoomViewContent = () => {
               <span className="text-gray-300">|</span>
               <span className="text-gray-900 font-medium">{roomData?.name}</span>
             </nav>
-            <ConnectionStatus />
+            <div className="flex items-center space-x-2 text-sm">
+              <div
+                className={`w-2 h-2 rounded-full ${
+                  isConnected ? "bg-green-500" : "bg-red-500"
+                }`}
+              />
+              <span className="text-gray-600">
+                {isConnected ? "Connected" : "Connecting..."}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -365,9 +372,17 @@ const RoomViewContent = () => {
 
           {/* Right Column */}
           <div className="space-y-6">
-            <RoomMembersPanel />
+            <RoomMembersPanel
+              members={members}
+              connectionState={connectionState}
+            />
             <div className="h-96">
-              <RoomChatComponent roomId={roomId} />
+              <RoomChatComponent
+                roomId={roomId}
+                isConnected={isConnected}
+                messages={messages}
+                sendMessage={sendMessage}
+              />
             </div>
           </div>
         </div>
@@ -425,16 +440,6 @@ const RoomViewContent = () => {
 
       <Footer />
     </div>
-  );
-};
-
-const RoomView = () => {
-  const { roomId } = useParams();
-
-  return (
-    <RoomSocketProvider roomId={roomId || ""}>
-      <RoomViewContent />
-    </RoomSocketProvider>
   );
 };
 

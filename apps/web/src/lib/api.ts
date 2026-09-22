@@ -1,7 +1,6 @@
 import axios from "axios";
 import { getSessionToken } from "./auth";
-
-const API_BASE_URL = "http://localhost:8080/api";
+import { API_BASE_URL } from "./config";
 
 export const api = axios.create({
   baseURL: API_BASE_URL,
@@ -14,16 +13,20 @@ export const api = axios.create({
 // call site has to remember to.
 api.interceptors.request.use(async (config) => {
   const token = await getSessionToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  // Fail closed. Sending the request without a token would only turn a missing
+  // session into a confusing 401 from the server.
+  if (!token) {
+    throw new Error("No Clerk session token available");
   }
+  config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
 export const userApi = {
-  // create user (called when Clerk user signs up)
-  createUser: async (userData: { email: string; name: string }) => {
-    const response = await api.post("/users", userData);
+  // Idempotent: mirrors the caller's Clerk profile into the backend. Email and
+  // name come from Clerk server-side, so there is nothing to send.
+  syncUser: async () => {
+    const response = await api.post("/users");
     return response.data;
   },
 
