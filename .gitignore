@@ -13,3 +13,5 @@ apps/backend/.venv/
 tech-notes.md
 
 docs/next-steps.md
+
+tmp/*

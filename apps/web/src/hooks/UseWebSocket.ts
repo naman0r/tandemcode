@@ -1,8 +1,9 @@
 // custom hook
-import { useState, useEffect, useRef } from "react";
-import { useUser } from "../hooks/useUser";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useAuth } from "@clerk/clerk-react";
+import { WS_BASE_URL } from "../lib/config";
 
-interface ChatMessage {
+export interface ChatMessage {
   id: string;
   text: string;
   username: string;
@@ -10,122 +11,146 @@ interface ChatMessage {
   isOwn: boolean;
 }
 
-const useWebSocket = (roomId: string) => {
-  // connection management
-  // message sending/recieving
-  // connection state tracking
-  const [isConnected, setIsConnected] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [connectionState, setConnectionState] = useState<
-    "connecting" | "connected" | "disconnected"
-  >("disconnected");
+export interface RoomMember {
+  userId: string;
+  name: string | null;
+  role: string;
+  joinedAt: string;
+}
 
-  const { clerkUser } = useUser();
-  const userId = clerkUser?.id;
+export type ConnectionState = "connecting" | "connected" | "disconnected";
+
+// Backoff for an unexpected drop. Bounded: a handshake the server refuses on
+// policy will never start succeeding, so retrying forever just spins.
+const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000];
+
+/**
+ * The room's single websocket: connection state, chat and presence.
+ *
+ * Called once, by RoomView, which passes the pieces down. Calling it from each
+ * consumer would open a connection per consumer.
+ */
+const useWebSocket = (roomId: string) => {
+  const [connectionState, setConnectionState] =
+    useState<ConnectionState>("connecting");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [members, setMembers] = useState<RoomMember[]>([]);
+
+  const { getToken, userId } = useAuth();
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
 
   const wsRef = useRef<WebSocket | null>(null);
 
-  const sendMessage = (text: string) => {
-    if (
-      wsRef.current &&
-      wsRef.current.readyState === WebSocket.OPEN &&
-      clerkUser
-    ) {
-      // Send structured message with user info
-      const messageData = {
-        text: text,
-        userId: clerkUser.id,
-        username: clerkUser.fullName || clerkUser.firstName || "Unknown User",
-        timestamp: new Date().toISOString(),
-      };
+  const sendMessage = useCallback((text: string) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-      wsRef.current.send(JSON.stringify(messageData));
-    } else {
-      console.log(
-        "websocket not connected or user not loaded, cannot send message"
-      );
-    }
-  };
+    // Text only. The server stamps the sender, display name and time, so this
+    // cannot claim to be anyone.
+    ws.send(JSON.stringify({ type: "chat", text }));
+  }, []);
 
   useEffect(() => {
-    if (!roomId || !userId) return; // Wait for both roomId and userId
+    if (!roomId || !userId) return;
 
-    // set connection state
+    // A different room is a different conversation and a different roster.
+    setMessages([]);
+    setMembers([]);
     setConnectionState("connecting");
-    setIsConnected(false);
 
-    // create websocket connection
-    const ws = new WebSocket(
-      `ws://localhost:8080/ws/room/${roomId}?userId=${userId}`
-    );
-    wsRef.current = ws;
+    let disposed = false;
+    let attempt = 0;
+    let retry: ReturnType<typeof setTimeout> | undefined;
 
-    // when the connection opens:
-    ws.onopen = () => {
-      console.log("Connected to room: ", roomId);
-      setIsConnected(true);
-      setConnectionState("connected");
-    };
+    // The browser cannot send an Authorization header on a websocket, so the
+    // session token goes in the query string. Fetching it makes this async, and
+    // the effect can be torn down while we wait.
+    const connect = async () => {
+      const token = await getTokenRef.current();
+      if (disposed) return;
 
-    // when we receive a message:
-    ws.onmessage = (event) => {
-      console.log("received message", event.data);
-
-      try {
-        // Try to parse as JSON (new format)
-        const messageData = JSON.parse(event.data);
-
-        const newMessage: ChatMessage = {
-          id: Date.now().toString(),
-          text: messageData.text,
-          username:
-            messageData.userId === clerkUser?.id ? "You" : messageData.username,
-          timestamp: new Date(messageData.timestamp),
-          isOwn: messageData.userId === clerkUser?.id,
-        };
-
-        setMessages((prev) => [...prev, newMessage]);
-      } catch (error) {
-        // Fallback for old format (plain text) - for backward compatibility
-        console.log("Received plain text message:", event.data);
-
-        const newMessage: ChatMessage = {
-          id: Date.now().toString(),
-          text: event.data,
-          username: "Other user",
-          timestamp: new Date(),
-          isOwn: false,
-        };
-
-        setMessages((prev) => [...prev, newMessage]);
+      if (!token) {
+        setConnectionState("disconnected");
+        return;
       }
+
+      const ws = new WebSocket(
+        `${WS_BASE_URL}/ws/room/${roomId}?token=${encodeURIComponent(token)}`
+      );
+      wsRef.current = ws;
+
+      ws.onopen = () => {
+        if (disposed) return;
+        attempt = 0;
+        setConnectionState("connected");
+      };
+
+      ws.onmessage = (event) => {
+        if (disposed) return;
+
+        let payload;
+        try {
+          payload = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+
+        if (payload.type === "presence") {
+          setMembers(payload.members);
+          return;
+        }
+
+        if (payload.type === "chat") {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: `${payload.userId}-${payload.timestamp}-${prev.length}`,
+              text: payload.text,
+              username: payload.userId === userId ? "You" : payload.username,
+              timestamp: new Date(payload.timestamp),
+              isOwn: payload.userId === userId,
+            },
+          ]);
+        }
+      };
+
+      // Both handlers bail when disposed, so a socket the cleanup already
+      // closed cannot report state on behalf of the one replacing it.
+      ws.onclose = () => {
+        if (disposed) return;
+        setConnectionState("disconnected");
+        setMembers([]);
+
+        const delay = RECONNECT_DELAYS_MS[attempt];
+        if (delay === undefined) return;
+        attempt += 1;
+        // Reconnecting re-enters connect(), which fetches a fresh token; the
+        // old one has very likely expired by now.
+        retry = setTimeout(connect, delay);
+      };
+
+      ws.onerror = () => {
+        if (!disposed) setConnectionState("disconnected");
+      };
     };
 
-    // when the connection closes:
-    ws.onclose = () => {
-      console.log("Disconnectef from room: ", roomId);
-      setIsConnected(false);
-      setConnectionState("disconnected");
-    };
+    connect();
 
-    // when theres some error lol
-    ws.onerror = (error) => {
-      console.error("WebSocket error", error);
-      setConnectionState("disconnected");
-      setIsConnected(false);
-    };
-
-    // cleanup function - runs when the component unmounts
     return () => {
-      ws.close();
+      disposed = true;
+      clearTimeout(retry);
+      wsRef.current?.close();
+      wsRef.current = null;
     };
-  }, [roomId, userId]); // reconnect when roomId or userId changes
+  }, [roomId, userId]);
 
   return {
-    isConnected,
-    messages,
-    sendMessage,
+    isConnected: connectionState === "connected",
     connectionState,
+    messages,
+    members,
+    sendMessage,
   };
 };
 

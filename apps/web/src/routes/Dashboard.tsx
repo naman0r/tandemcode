@@ -1,9 +1,10 @@
 import { useUser } from "../hooks/useUser";
-import { SignOutButton } from "@clerk/clerk-react";
+import { SignOutButton, useUser as useClerkUser } from "@clerk/clerk-react";
+import { API_BASE_URL } from "../lib/config";
 
 export default function Dashboard() {
-  const { clerkUser, backendUser, isLoaded, isSignedIn, isCreating, error } =
-    useUser();
+  const { user: clerkUser, isLoaded, isSignedIn } = useClerkUser();
+  const backendUser = useUser();
 
   if (!isLoaded) {
     return (
@@ -56,29 +57,7 @@ export default function Dashboard() {
                 User Sync Status
               </h2>
 
-              {isCreating && (
-                <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                  <div className="flex">
-                    <div className="ml-3">
-                      <p className="text-sm text-blue-800">
-                        🔄 Syncing your account with backend...
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                  <div className="flex">
-                    <div className="ml-3">
-                      <p className="text-sm text-red-800">❌ Error: {error}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {backendUser && !isCreating && (
+              {backendUser && (
                 <div className="bg-green-50 border border-green-200 rounded-md p-4">
                   <div className="flex">
                     <div className="ml-3">
@@ -178,9 +157,8 @@ export default function Dashboard() {
               <div className="text-xs text-gray-600 space-y-1">
                 <div>Clerk Loaded: {isLoaded ? "✅" : "❌"}</div>
                 <div>Signed In: {isSignedIn ? "✅" : "❌"}</div>
-                <div>Creating User: {isCreating ? "🔄" : "✅"}</div>
                 <div>Backend User Exists: {backendUser ? "✅" : "❌"}</div>
-                <div>API Base: http://localhost:8080/api</div>
+                <div>API Base: {API_BASE_URL}</div>
               </div>
             </div>
           </div>

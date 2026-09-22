@@ -38,3 +38,7 @@ Migrations run automatically when the backend boots. To apply them by hand:
 ```bash
 (cd apps/backend && .venv/bin/python -m app.migrate)
 ```
+
+Getting JWT token (expires literally in a minute):
+
+- `await window.Clerk.session.getToken()`

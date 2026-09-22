@@ -8,7 +8,7 @@ from app.dependencies import get_problem_service
 from app.schemas.problems import CreateProblemRequest, ProblemResponse
 from app.services.problems import ProblemService
 
-router = APIRouter(prefix="/api/problems", tags=["problems"])
+router = APIRouter(prefix="/problems", tags=["problems"])
 
 
 @router.get("", response_model=list[ProblemResponse])

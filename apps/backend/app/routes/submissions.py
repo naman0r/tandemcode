@@ -4,21 +4,22 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
 
-from app.dependencies import get_submission_service
+from app.dependencies import current_user_id, get_submission_service
 from app.schemas.submissions import SubmissionResponse, SubmitRequest
 from app.services.submissions import SubmissionService
 
-router = APIRouter(prefix="/api/submissions", tags=["submissions"])
+router = APIRouter(prefix="/submissions", tags=["submissions"])
 
 
 @router.post("", response_model=SubmissionResponse)
 async def submit_code(
     payload: SubmitRequest,
+    user_id: str = Depends(current_user_id),
     service: SubmissionService = Depends(get_submission_service),
 ) -> SubmissionResponse:
     submission = await service.submit(
         room_id=payload.roomId,
-        user_id=payload.userId,
+        user_id=user_id,
         problem_id=payload.problemId,
         language=payload.language,
         code=payload.code,

@@ -1,35 +1,20 @@
-import React, { useState, useRef, useEffect } from "react";
-import useWebSocket from "../hooks/UseWebSocket";
-
-interface ChatMessage {
-  id: string;
-  text: string;
-  username: string;
-  timestamp: Date;
-  isOwn: boolean;
-}
+import React, { useState } from "react";
+import type { ChatMessage } from "../hooks/UseWebSocket";
 
 interface RoomChatComponentProps {
   roomId?: string;
+  isConnected: boolean;
+  messages: ChatMessage[];
+  sendMessage: (text: string) => void;
 }
 
-const RoomChatComponent: React.FC<RoomChatComponentProps> = ({ roomId }) => {
-  // Use our WebSocket hook for real-time messaging
-  const { isConnected, messages, sendMessage, connectionState } = useWebSocket(
-    roomId || ""
-  );
-
+const RoomChatComponent: React.FC<RoomChatComponentProps> = ({
+  roomId,
+  isConnected,
+  messages,
+  sendMessage,
+}) => {
   const [newMessage, setNewMessage] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  // Auto-scroll to bottom when new messages arrive (only if messages exist)
-  useEffect(() => {
-    // Only scroll if there are actual messages
-    if (messages.length > 0) {
-      // ENABLE/DISABLE AUTOSCROLL. ANNOYINF GFR DEV WORK
-      //messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [messages]);
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,7 +89,6 @@ const RoomChatComponent: React.FC<RoomChatComponentProps> = ({ roomId }) => {
             </div>
           </div>
         ))}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Message Input */}

@@ -6,6 +6,7 @@ from app.dao.problems import ProblemDAO
 from app.dao.rooms import RoomDAO
 from app.dao.submissions import SubmissionDAO
 from app.dao.users import UserDAO
+from app.services.rooms import get_active_room
 
 
 class SubmissionService:
@@ -29,12 +30,7 @@ class SubmissionService:
         language: str,
         code: str,
     ) -> dict:
-        room_exists = await self.room_dao.exists(room_id)
-        if not room_exists:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Room not found: {room_id}",
-            )
+        await get_active_room(self.room_dao, room_id)
 
         problem_exists = await self.problem_dao.exists(problem_id)
         if not problem_exists:
@@ -59,9 +55,11 @@ class SubmissionService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Submission not found: {submission_id}",
             )
+        await get_active_room(self.room_dao, submission["roomId"])
         return submission
 
-    async def list_submissions(self, room_id: str, user_id: str | None) -> list[dict]:
+    async def list_submissions(self, room_id: str, user_id: str | None = None) -> list[dict]:
+        await get_active_room(self.room_dao, room_id)
         if user_id:
             return await self.submission_dao.list_by_room_and_user(room_id, user_id)
         return await self.submission_dao.list_by_room(room_id)

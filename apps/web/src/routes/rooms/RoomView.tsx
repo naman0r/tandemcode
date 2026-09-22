@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { useUser } from "@clerk/clerk-react";
 import Header from "../../components/Header";
 import Footer from "../../components/Footer";
@@ -25,6 +25,14 @@ type Submission = {
   createdAt: string;
 };
 
+type Room = {
+  id: string;
+  name: string;
+  description: string | null;
+  createdBy: string;
+  currentProblemId: string | null;
+};
+
 const DIFFICULTY_COLORS: Record<string, string> = {
   easy: "text-green-600 bg-green-50 border-green-200",
   medium: "text-yellow-600 bg-yellow-50 border-yellow-200",
@@ -39,11 +47,42 @@ const STATUS_COLORS: Record<string, string> = {
   error: "text-red-600 bg-red-50",
 };
 
+const LeaveRoomButton = ({ roomId }: { roomId: string }) => {
+  const navigate = useNavigate();
+  const [leaving, setLeaving] = useState(false);
+
+  const handleLeave = async () => {
+    setLeaving(true);
+    try {
+      await roomApi.leaveRoom(roomId);
+    } catch (err) {
+      // Staying put matters: navigating anyway would close the socket while the
+      // room is still marked active and nobody is in it.
+      console.error("Failed to leave room:", err);
+      setLeaving(false);
+      return;
+    }
+    // Navigating unmounts the hook, which closes the socket and lets the server
+    // tell everyone still here that we have gone.
+    navigate("/rooms");
+  };
+
+  return (
+    <button
+      onClick={handleLeave}
+      disabled={leaving}
+      className="bg-red-50 text-red-700 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors border border-red-200 text-sm disabled:opacity-50"
+    >
+      {leaving ? "Leaving..." : "Leave room"}
+    </button>
+  );
+};
+
 const RoomView = () => {
   const { roomId } = useParams();
   const { user } = useUser();
 
-  const [roomData, setRoomData] = useState<any>(null);
+  const [roomData, setRoomData] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
   const [currentProblem, setCurrentProblem] = useState<Problem | null>(null);
   const [code, setCode] = useState("# Write your solution here\n");
@@ -54,8 +93,8 @@ const RoomView = () => {
   const [availableProblems, setAvailableProblems] = useState<Problem[]>([]);
   const [loadingProblems, setLoadingProblems] = useState(false);
 
-  const { connectionState } = useWebSocket(roomId || "");
-  const isConnected = connectionState === "connected";
+  const { isConnected, connectionState, messages, members, sendMessage } =
+    useWebSocket(roomId || "");
   const isRoomCreator = roomData?.createdBy === user?.id;
 
   // Fetch room data
@@ -69,9 +108,11 @@ const RoomView = () => {
       } catch (err) {
         console.error("Error fetching room:", err);
         setRoomData({
+          id: "",
           name: "Room not found",
           description: "This room may have been deleted.",
           createdBy: "",
+          currentProblemId: null,
         });
       } finally {
         setLoading(false);
@@ -123,7 +164,6 @@ const RoomView = () => {
       setIsSubmitting(true);
       const submission = await submissionApi.submit({
         roomId,
-        userId: user.id,
         problemId: currentProblem.id,
         language,
         code,
@@ -217,9 +257,7 @@ const RoomView = () => {
               >
                 Copy room ID
               </button>
-              <button className="bg-red-50 text-red-700 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors border border-red-200 text-sm">
-                Leave room
-              </button>
+              <LeaveRoomButton roomId={roomId || ""} />
             </div>
           </div>
         </div>
@@ -334,9 +372,17 @@ const RoomView = () => {
 
           {/* Right Column */}
           <div className="space-y-6">
-            <RoomMembersPanel roomId={roomId || ""} />
+            <RoomMembersPanel
+              members={members}
+              connectionState={connectionState}
+            />
             <div className="h-96">
-              <RoomChatComponent roomId={roomId} />
+              <RoomChatComponent
+                roomId={roomId}
+                isConnected={isConnected}
+                messages={messages}
+                sendMessage={sendMessage}
+              />
             </div>
           </div>
         </div>

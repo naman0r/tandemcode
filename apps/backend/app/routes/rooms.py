@@ -1,25 +1,28 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 
-from app.dependencies import get_room_service
+from app.dependencies import current_user_id, get_room_service
+from app.dao.room_members import RoomMemberDAO
 from app.schemas.rooms import (
     CreateRoomRequest,
+    LeaveRoomResponse,
     RoomResponse,
     SetProblemRequest,
     UserInRoomResponse,
 )
 from app.services.rooms import RoomService
 
-router = APIRouter(prefix="/api/rooms", tags=["rooms"])
+router = APIRouter(prefix="/rooms", tags=["rooms"])
 
 
 @router.post("", response_model=RoomResponse)
 async def create_room(
     payload: CreateRoomRequest,
+    user_id: str = Depends(current_user_id),
     service: RoomService = Depends(get_room_service),
 ) -> RoomResponse:
-    room = await service.create_room(payload.name, payload.description, payload.createdBy)
+    room = await service.create_room(payload.name, payload.description, user_id)
     return RoomResponse.model_validate(room)
 
 
@@ -49,13 +52,28 @@ async def list_room_members(
     return [UserInRoomResponse.model_validate(member) for member in members]
 
 
+@router.post("/{room_id}/leave", response_model=LeaveRoomResponse)
+async def leave_room(
+    room_id: str,
+    request: Request,
+    caller_id: str = Depends(current_user_id),
+    service: RoomService = Depends(get_room_service),
+) -> LeaveRoomResponse:
+    result = await service.leave_room(room_id, caller_id)
+    await request.app.state.room_chat_manager.close_user(
+        room_id, caller_id, RoomMemberDAO(request.app.state.db_pool)
+    )
+    return LeaveRoomResponse.model_validate(result)
+
+
 @router.patch("/{room_id}/problem", response_model=RoomResponse)
 async def set_current_problem(
     room_id: str,
     payload: SetProblemRequest,
+    caller_id: str = Depends(current_user_id),
     service: RoomService = Depends(get_room_service),
 ) -> RoomResponse:
-    room = await service.set_current_problem(room_id, payload.problemId)
+    room = await service.set_current_problem(room_id, payload.problemId, caller_id)
     return RoomResponse.model_validate(room)
 
 

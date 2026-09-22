@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
-import Editor, { OnMount } from "@monaco-editor/react";
+import { useAuth } from "@clerk/clerk-react";
+import Editor from "@monaco-editor/react";
+import type { OnMount } from "@monaco-editor/react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
+import { WS_BASE_URL } from "../lib/config";
 
 interface Props {
   roomId: string;
@@ -16,11 +19,25 @@ const MONACO_LANGUAGE: Record<string, string> = {
   java: "java",
 };
 
-const WS_URL = "ws://localhost:8080/ws/yjs";
+const WS_URL = `${WS_BASE_URL}/ws/yjs`;
+
+type MonacoEditor = Parameters<OnMount>[0];
+type Monaco = Parameters<OnMount>[1];
+
+// Clerk session tokens last about a minute. y-websocket re-reads provider.params
+// every time it dials, so refreshing well inside that window is what lets a
+// dropped connection come back instead of failing the handshake forever.
+const TOKEN_REFRESH_MS = 30_000;
 
 const CollaborativeEditor = ({ roomId, language, onCodeChange }: Props) => {
-  const editorRef = useRef<any>(null);
-  const monacoRef = useRef<any>(null);
+  const { getToken, isLoaded, isSignedIn, sessionId } = useAuth();
+  // Held in a ref so that a fresh getToken identity from Clerk cannot re-run the
+  // effect below and tear down the shared document mid-session.
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+
+  const editorRef = useRef<MonacoEditor | null>(null);
+  const monacoRef = useRef<Monaco | null>(null);
   const ydocRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
   const bindingRef = useRef<MonacoBinding | null>(null);
@@ -34,7 +51,7 @@ const CollaborativeEditor = ({ roomId, language, onCodeChange }: Props) => {
   const createBinding = (
     ydoc: Y.Doc,
     provider: WebsocketProvider,
-    editor: any
+    editor: MonacoEditor
   ) => {
     bindingRef.current?.destroy();
     const ytext = ydoc.getText("code");
@@ -48,28 +65,54 @@ const CollaborativeEditor = ({ roomId, language, onCodeChange }: Props) => {
   };
 
   // Initialize the Yjs doc and WebSocket provider once per roomId.
-  // y-websocket connects to our Spring Boot relay at /ws/yjs/{roomId},
-  // which forwards binary Yjs messages to all other sessions in the room.
+  // y-websocket connects to our relay at /ws/yjs/{roomId}, which forwards
+  // binary Yjs messages to all other sessions in the room. The relay rejects
+  // the handshake without a valid session token, which is why the connection
+  // cannot be opened until getToken resolves.
   useEffect(() => {
-    const ydoc = new Y.Doc();
-    const provider = new WebsocketProvider(WS_URL, roomId, ydoc);
-    ydocRef.current = ydoc;
-    providerRef.current = provider;
+    if (!roomId || !isLoaded || !isSignedIn) return;
 
-    // StrictMode re-run: editor is already mounted, recreate binding now.
-    if (editorRef.current) {
-      createBinding(ydoc, provider, editorRef.current);
-    }
+    const ydoc = new Y.Doc();
+    ydocRef.current = ydoc;
+
+    let cancelled = false;
+    let refresh: ReturnType<typeof setInterval> | undefined;
+
+    const connect = async () => {
+      const token = await getTokenRef.current();
+      if (cancelled || !token) return;
+
+      const provider = new WebsocketProvider(WS_URL, roomId, ydoc, {
+        params: { token },
+      });
+      providerRef.current = provider;
+
+      refresh = setInterval(async () => {
+        const next = await getTokenRef.current();
+        if (next) {
+          provider.params.token = next;
+        }
+      }, TOKEN_REFRESH_MS);
+
+      // StrictMode re-run: editor is already mounted, recreate binding now.
+      if (editorRef.current) {
+        createBinding(ydoc, provider, editorRef.current);
+      }
+    };
+
+    connect();
 
     return () => {
+      cancelled = true;
+      clearInterval(refresh);
       bindingRef.current?.destroy();
       bindingRef.current = null;
-      provider.destroy();
-      ydoc.destroy();
+      providerRef.current?.destroy();
       providerRef.current = null;
+      ydoc.destroy();
       ydocRef.current = null;
     };
-  }, [roomId]);
+  }, [roomId, isLoaded, isSignedIn, sessionId]);
 
   // Keep Monaco syntax highlighting in sync with the language selector
   // without recreating the model (which would break the Yjs binding).

@@ -3,17 +3,19 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import CORS_ORIGINS, RUN_MIGRATIONS_ON_STARTUP
 from app.dao.room_members import RoomMemberDAO
 from app.database import create_pool
+from app.dependencies import current_user_id
 from app.migrate import migrate
 from app.routes.problems import router as problems_router
 from app.routes.rooms import router as rooms_router
 from app.routes.submissions import router as submissions_router
 from app.routes.users import router as users_router
+from app.websocket.auth import Participant, room_participant
 from app.websocket.room_chat import RoomChatManager
 from app.websocket.yjs import YjsRelayManager
 
@@ -43,10 +45,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(users_router)
-app.include_router(problems_router)
-app.include_router(rooms_router)
-app.include_router(submissions_router)
+# One place decides that the API is authenticated. A resource router added
+# below inherits it and cannot be left open by omission.
+api_router = APIRouter(prefix="/api", dependencies=[Depends(current_user_id)])
+api_router.include_router(users_router)
+api_router.include_router(problems_router)
+api_router.include_router(rooms_router)
+api_router.include_router(submissions_router)
+
+app.include_router(api_router)
 
 
 @app.get("/health")
@@ -55,17 +62,20 @@ async def healthcheck() -> dict[str, str]:
 
 
 @app.websocket("/ws/room/{room_id}")
-async def room_websocket(websocket: WebSocket, room_id: str) -> None:
+async def room_websocket(
+    websocket: WebSocket,
+    room_id: str,
+    participant: Participant = Depends(room_participant),
+) -> None:
     manager: RoomChatManager = websocket.app.state.room_chat_manager
     room_member_dao = RoomMemberDAO(websocket.app.state.db_pool)
-    user_id = websocket.query_params.get("userId")
 
-    await manager.join(websocket, room_id, user_id, room_member_dao)
-
+    # join() is inside the try so that a failure part-way through still unwinds
+    # through leave() and takes the presence row with it.
     try:
+        await manager.join(websocket, room_id, participant, room_member_dao)
         while True:
-            message = await websocket.receive_text()
-            await manager.broadcast(room_id, message)
+            await manager.relay_chat(room_id, websocket, await websocket.receive_text())
     except WebSocketDisconnect:
         pass
     finally:
@@ -73,7 +83,11 @@ async def room_websocket(websocket: WebSocket, room_id: str) -> None:
 
 
 @app.websocket("/ws/yjs/{room_id}")
-async def yjs_websocket(websocket: WebSocket, room_id: str) -> None:
+async def yjs_websocket(
+    websocket: WebSocket,
+    room_id: str,
+    _participant: Participant = Depends(room_participant),
+) -> None:
     manager: YjsRelayManager = websocket.app.state.yjs_relay_manager
     await manager.connect(websocket, room_id)
 

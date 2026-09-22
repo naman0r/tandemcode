@@ -35,7 +35,6 @@ const CreateRoom = () => {
       const roomData = {
         name: formData.name.trim(),
         description: formData.description.trim(),
-        createdBy: user.id,
       };
 
       const newRoom = await roomApi.createRoom(roomData);
