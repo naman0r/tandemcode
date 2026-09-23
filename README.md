@@ -18,7 +18,6 @@ hidden tests.
 
 - Any AWS piece. The README used to plan SQS, Fargate, S3 and RDS; none of it
   is built. The runner takes work from the submissions table. See #33.
-- Session replay. The events table is empty. See #34.
 - Complexity estimates, counterexamples, languages other than Python.
 
 ## Stack
@@ -106,6 +105,18 @@ expected string. The runner stops at the first failure. Statuses are
 `accepted`, `wrong_answer`, `runtime_error` and `time_limit_exceeded`. The
 judge is a pure function in `apps/backend/app/runner/judge.py`, so a hosted
 runner can call the same thing.
+
+## Sandbox
+
+With `SANDBOX_IMAGE` set, as it is in docker compose, the runner judges each
+submission in a fresh container from that image: no network, read-only root,
+a 64 MB `/tmp`, uid 65534, all capabilities dropped, a memory cap and 32
+processes. Without it, the runner judges in-process with rlimits only, which
+is fine for tests and not for strangers' code.
+
+The runner reaches Docker through the host's socket, so the runner itself is
+as trusted as the host. Keep it on a machine that runs nothing else, or move
+judging to Fargate or gVisor before opening sign-ups.
 
 ## Contributing
 

@@ -115,3 +115,20 @@ def judge(code: str, tests: list[dict], time_limit_ms: int, mem_limit_mb: int) -
             break
 
     return verdict
+
+
+if __name__ == "__main__":
+    # Entry point when this file is shipped into a sandbox container: the
+    # spec arrives on stdin and the verdict leaves on stdout, both as JSON.
+    import ctypes
+    import json
+
+    # The program runs under our uid, so without this it could open
+    # /proc/1/fd/1 and print a verdict of its own. A non-dumpable process's
+    # /proc entries belong to root; the program regains dumpability on exec.
+    PR_SET_DUMPABLE = 4
+    ctypes.CDLL(None).prctl(PR_SET_DUMPABLE, 0)
+
+    spec = json.load(sys.stdin)
+    result = judge(spec["code"], spec["tests"], spec["timeLimitMs"], spec["memLimitMb"])
+    print(json.dumps(result.as_dict()))

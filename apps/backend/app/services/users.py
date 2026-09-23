@@ -40,6 +40,3 @@ class UserService:
                 detail=f"User not found with id: {user_id}",
             )
         return user
-
-    async def list_users(self) -> list[dict]:
-        return await self.user_dao.list_all()

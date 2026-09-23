@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 
-from fastapi import WebSocket
+from fastapi import WebSocket, WebSocketException, status
 
 from app.dao.room_updates import RoomUpdateDAO
 
@@ -19,6 +19,10 @@ EMPTY_SYNC_STEP2 = b"\x00\x01\x02\x00\x00"
 # SyncStep2 and Update both carry document changes; those are what a replay
 # needs. SyncStep1 is a request and awareness (message type 1) is cursors.
 DOCUMENT_CHANGE_PREFIXES = (b"\x00\x01", b"\x00\x02")
+
+# A full sync of a long solution is tens of kilobytes. Anything near this is
+# not an editor and every frame is stored, so the socket is closed instead.
+MAX_FRAME_BYTES = 256 * 1024
 
 
 class YjsRelayManager:
@@ -48,6 +52,8 @@ class YjsRelayManager:
                 logger.exception("Failed to relay Yjs text message for room %s", room_id)
 
     async def relay_bytes(self, room_id: str, sender: WebSocket, payload: bytes) -> None:
+        if len(payload) > MAX_FRAME_BYTES:
+            raise WebSocketException(code=status.WS_1009_MESSAGE_TOO_BIG, reason="Frame too large")
         sessions = list(self.room_sessions.get(room_id, set()))
         if sessions == [sender] and payload.startswith(SYNC_STEP1_PREFIX):
             await sender.send_bytes(EMPTY_SYNC_STEP2)

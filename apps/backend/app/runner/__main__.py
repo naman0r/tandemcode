@@ -8,16 +8,30 @@ database without judging the same submission twice.
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
+import os
 
 from app.dao.problems import ProblemDAO
 from app.dao.submissions import SubmissionDAO
 from app.database import create_pool
+from app.runner import sandbox
 from app.runner.judge import RUNTIME_ERROR, Verdict, judge
 
 logger = logging.getLogger(__name__)
 
 POLL_SECONDS = 1.0
+
+# With an image set, every submission runs in its own container with no
+# network. Unset, the judge runs in this process: fine for tests and for
+# development without a Docker socket, not for strangers' code.
+SANDBOX_IMAGE = os.getenv("SANDBOX_IMAGE")
+
+
+def run_judge(code: str, tests: list[dict], time_limit_ms: int, mem_limit_mb: int) -> Verdict:
+    if SANDBOX_IMAGE:
+        return sandbox.judge_in_container(SANDBOX_IMAGE, code, tests, time_limit_ms, mem_limit_mb)
+    return judge(code, tests, time_limit_ms, mem_limit_mb)
 
 
 async def judge_next(submissions: SubmissionDAO, problems: ProblemDAO) -> bool:
@@ -29,7 +43,7 @@ async def judge_next(submissions: SubmissionDAO, problems: ProblemDAO) -> bool:
     try:
         spec = await problems.get_judge_spec(submission["problemId"])
         verdict = await asyncio.to_thread(
-            judge, submission["code"] or "", spec["tests"], spec["timeLimitMs"], spec["memLimitMb"]
+            run_judge, submission["code"] or "", spec["tests"], spec["timeLimitMs"], spec["memLimitMb"]
         )
     except Exception:
         # The judge, not the program, failed. The row must not stay "running"
@@ -44,6 +58,11 @@ async def judge_next(submissions: SubmissionDAO, problems: ProblemDAO) -> bool:
 
 async def main() -> None:
     logging.basicConfig(level=logging.INFO)
+    if SANDBOX_IMAGE:
+        await asyncio.to_thread(functools.partial(sandbox.pull, SANDBOX_IMAGE))
+        logger.info("Submissions run in %s containers with no network", SANDBOX_IMAGE)
+    else:
+        logger.warning("SANDBOX_IMAGE is not set: submissions run in this process")
     pool = await create_pool()
     submissions, problems = SubmissionDAO(pool), ProblemDAO(pool)
     # Rows left "running" by a runner that died mid-judge would never be

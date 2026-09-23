@@ -24,11 +24,3 @@ async def get_user(
 ) -> UserResponse:
     user = await service.get_user(user_id)
     return UserResponse.model_validate(user)
-
-
-@router.get("", response_model=list[UserResponse])
-async def list_users(
-    service: UserService = Depends(get_user_service),
-) -> list[UserResponse]:
-    users = await service.list_users()
-    return [UserResponse.model_validate(user) for user in users]

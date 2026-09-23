@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 
 from app.dependencies import get_problem_service
-from app.schemas.problems import CreateProblemRequest, ProblemResponse
+from app.schemas.problems import ProblemResponse
 from app.services.problems import ProblemService
 
 router = APIRouter(prefix="/problems", tags=["problems"])
@@ -35,19 +35,4 @@ async def get_problem(
     service: ProblemService = Depends(get_problem_service),
 ) -> ProblemResponse:
     problem = await service.get_problem(problem_id)
-    return ProblemResponse.model_validate(problem)
-
-
-@router.post("", response_model=ProblemResponse)
-async def create_problem(
-    payload: CreateProblemRequest,
-    service: ProblemService = Depends(get_problem_service),
-) -> ProblemResponse:
-    problem = await service.create_problem(
-        slug=payload.slug,
-        title=payload.title,
-        difficulty=payload.difficulty,
-        time_limit_ms=payload.timeLimitMs,
-        mem_limit_mb=payload.memLimitMb,
-    )
     return ProblemResponse.model_validate(problem)
