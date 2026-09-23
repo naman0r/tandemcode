@@ -10,6 +10,7 @@ import { WS_BASE_URL } from "../lib/config";
 interface Props {
   roomId: string;
   language: string;
+  starterCode?: string | null;
   onCodeChange: (code: string) => void;
 }
 
@@ -29,7 +30,12 @@ type Monaco = Parameters<OnMount>[1];
 // dropped connection come back instead of failing the handshake forever.
 const TOKEN_REFRESH_MS = 30_000;
 
-const CollaborativeEditor = ({ roomId, language, onCodeChange }: Props) => {
+const CollaborativeEditor = ({
+  roomId,
+  language,
+  starterCode,
+  onCodeChange,
+}: Props) => {
   const { getToken, isLoaded, isSignedIn, sessionId } = useAuth();
   // Held in a ref so that a fresh getToken identity from Clerk cannot re-run the
   // effect below and tear down the shared document mid-session.
@@ -41,6 +47,20 @@ const CollaborativeEditor = ({ roomId, language, onCodeChange }: Props) => {
   const ydocRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
   const bindingRef = useRef<MonacoBinding | null>(null);
+  const starterCodeRef = useRef(starterCode);
+  starterCodeRef.current = starterCode;
+
+  // The relay keeps no document, so a room's text lives only in its peers. The
+  // starter code goes in when the shared text is empty after sync, which is
+  // the first person to arrive with a problem assigned. Any later arrival
+  // syncs their text instead and leaves it alone.
+  const seedStarterCode = (ydoc: Y.Doc) => {
+    const starter = starterCodeRef.current;
+    const ytext = ydoc.getText("code");
+    if (starter && ytext.length === 0) {
+      ytext.insert(0, starter);
+    }
+  };
 
   // Creates (or recreates) the MonacoBinding once both the editor and the
   // Yjs provider are ready. Called from both handleMount and the provider
@@ -86,6 +106,9 @@ const CollaborativeEditor = ({ roomId, language, onCodeChange }: Props) => {
         params: { token },
       });
       providerRef.current = provider;
+      provider.on("sync", (synced: boolean) => {
+        if (synced) seedStarterCode(ydoc);
+      });
 
       refresh = setInterval(async () => {
         const next = await getTokenRef.current();
@@ -113,6 +136,12 @@ const CollaborativeEditor = ({ roomId, language, onCodeChange }: Props) => {
       ydocRef.current = null;
     };
   }, [roomId, isLoaded, isSignedIn, sessionId]);
+
+  useEffect(() => {
+    if (ydocRef.current && providerRef.current?.synced) {
+      seedStarterCode(ydocRef.current);
+    }
+  }, [starterCode]);
 
   // Keep Monaco syntax highlighting in sync with the language selector
   // without recreating the model (which would break the Yjs binding).

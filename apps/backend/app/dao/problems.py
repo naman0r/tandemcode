@@ -2,10 +2,17 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import json
+
 import asyncpg
+
+# The full test list never leaves the DAO through here: only the public
+# samples do, so a client cannot read the hidden tests off the API.
+COLUMNS = "id, slug, title, difficulty, time_limit_ms, mem_limit_mb, statement, starter_code, tests"
 
 
 def _map_problem(row: asyncpg.Record) -> dict:
+    tests = json.loads(row["tests"])
     return {
         "id": row["id"],
         "slug": row["slug"],
@@ -13,6 +20,11 @@ def _map_problem(row: asyncpg.Record) -> dict:
         "difficulty": row["difficulty"],
         "timeLimitMs": row["time_limit_ms"],
         "memLimitMb": row["mem_limit_mb"],
+        "statement": row["statement"],
+        "starterCode": row["starter_code"],
+        "samples": [
+            {"input": t["input"], "expected": t["expected"]} for t in tests if not t.get("hidden")
+        ],
     }
 
 
@@ -21,8 +33,8 @@ class ProblemDAO:
         self.pool = pool
 
     async def list_all(self) -> list[dict]:
-        query = """
-            SELECT id, slug, title, difficulty, time_limit_ms, mem_limit_mb
+        query = f"""
+            SELECT {COLUMNS}
             FROM problems
             ORDER BY title ASC
         """
@@ -31,8 +43,8 @@ class ProblemDAO:
         return [_map_problem(row) for row in rows]
 
     async def list_by_difficulty(self, difficulty: str) -> list[dict]:
-        query = """
-            SELECT id, slug, title, difficulty, time_limit_ms, mem_limit_mb
+        query = f"""
+            SELECT {COLUMNS}
             FROM problems
             WHERE difficulty = $1
             ORDER BY title ASC
@@ -42,8 +54,8 @@ class ProblemDAO:
         return [_map_problem(row) for row in rows]
 
     async def get_by_id(self, problem_id: UUID) -> dict | None:
-        query = """
-            SELECT id, slug, title, difficulty, time_limit_ms, mem_limit_mb
+        query = f"""
+            SELECT {COLUMNS}
             FROM problems
             WHERE id = $1
         """
@@ -52,8 +64,8 @@ class ProblemDAO:
         return _map_problem(row) if row else None
 
     async def get_by_slug(self, slug: str) -> dict | None:
-        query = """
-            SELECT id, slug, title, difficulty, time_limit_ms, mem_limit_mb
+        query = f"""
+            SELECT {COLUMNS}
             FROM problems
             WHERE slug = $1
         """
@@ -74,10 +86,10 @@ class ProblemDAO:
         time_limit_ms: int,
         mem_limit_mb: int,
     ) -> dict:
-        query = """
+        query = f"""
             INSERT INTO problems (slug, title, difficulty, time_limit_ms, mem_limit_mb)
             VALUES ($1, $2, $3, $4, $5)
-            RETURNING id, slug, title, difficulty, time_limit_ms, mem_limit_mb
+            RETURNING {COLUMNS}
         """
         async with self.pool.acquire() as conn:
             row = await conn.fetchrow(query, slug, title, difficulty, time_limit_ms, mem_limit_mb)

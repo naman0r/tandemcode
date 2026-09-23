@@ -13,6 +13,11 @@ class CreateProblemRequest(BaseModel):
     memLimitMb: int = Field(default=256)
 
 
+class SampleTest(BaseModel):
+    input: str
+    expected: str
+
+
 class ProblemResponse(BaseModel):
     id: UUID
     slug: str
@@ -20,3 +25,6 @@ class ProblemResponse(BaseModel):
     difficulty: str | None
     timeLimitMs: int
     memLimitMb: int
+    statement: str | None
+    starterCode: str | None
+    samples: list[SampleTest]
