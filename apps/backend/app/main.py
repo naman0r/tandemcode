@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import APIRouter, Depends, FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core import logging as access_logging
 from app.core.config import CORS_ORIGINS, RUN_MIGRATIONS_ON_STARTUP
 from app.dao.events import EventDAO
 from app.dao.room_members import RoomMemberDAO
@@ -23,6 +24,7 @@ from app.websocket.verdicts import VerdictListener
 from app.websocket.yjs import YjsRelayManager
 
 logging.basicConfig(level=logging.INFO)
+access_logging.install()
 
 
 @asynccontextmanager

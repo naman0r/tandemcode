@@ -35,6 +35,13 @@ services:
       RUN_MIGRATIONS_ON_STARTUP: ${RUN_MIGRATIONS_ON_STARTUP:-true}
     ports:
       - "8080:8080"
+    # The API applies migrations on start. Anything that reads the schema
+    # waits for this rather than racing it.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
     depends_on:
       db:
         condition: service_healthy
@@ -65,7 +72,25 @@ services:
     restart: unless-stopped
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
+
+  # The built web app behind nginx. Not started by default: development uses
+  # the Vite server. `docker compose --profile prod up` brings up everything.
+  web:
+    build:
+      context: ../web
+      args:
+        # Not required here: a hard requirement would break plain `docker
+        # compose up` for development. The web build fails if it is empty.
+        VITE_CLERK_PUBLISHABLE_KEY: ${VITE_CLERK_PUBLISHABLE_KEY:-}
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:8080}
+    container_name: tandemcode-web
+    profiles: ["prod"]
+    ports:
+      - "${WEB_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
   db-data:
