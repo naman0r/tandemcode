@@ -422,7 +422,7 @@ const RoomView = () => {
                 onClick={() => setShowProblemPicker(false)}
                 className="text-gray-400 hover:text-gray-600"
               >
-                ✕
+                Close
               </button>
             </div>
             <div className="overflow-y-auto flex-1">

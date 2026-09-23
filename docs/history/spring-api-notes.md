@@ -41,12 +41,12 @@ Mono<T> for one instance and Flux<T> for multiple instances.
 
 <br/>
 
-✅ Room Backend Complete:
-✅ Room entity with proper database mapping
-✅ Room repository with custom queries
-✅ Room REST API with all CRUD operations
-✅ Database schema correctly updated
-✅ All endpoints tested and working:
+Room Backend Complete:
+Room entity with proper database mapping
+Room repository with custom queries
+Room REST API with all CRUD operations
+Database schema correctly updated
+All endpoints tested and working:
 POST /api/rooms - creates rooms
 GET /api/rooms - lists active rooms
 GET /api/rooms/{id} - gets specific room

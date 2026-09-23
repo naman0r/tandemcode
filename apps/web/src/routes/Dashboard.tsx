@@ -62,7 +62,7 @@ export default function Dashboard() {
                   <div className="flex">
                     <div className="ml-3">
                       <p className="text-sm text-green-800">
-                        ✅ Account synced successfully!
+                        Account synced successfully!
                       </p>
                     </div>
                   </div>
@@ -155,9 +155,9 @@ export default function Dashboard() {
                 Debug Info
               </h3>
               <div className="text-xs text-gray-600 space-y-1">
-                <div>Clerk Loaded: {isLoaded ? "✅" : "❌"}</div>
-                <div>Signed In: {isSignedIn ? "✅" : "❌"}</div>
-                <div>Backend User Exists: {backendUser ? "✅" : "❌"}</div>
+                <div>Clerk Loaded: {isLoaded ? "Yes" : "No"}</div>
+                <div>Signed In: {isSignedIn ? "Yes" : "No"}</div>
+                <div>Backend User Exists: {backendUser ? "Yes" : "No"}</div>
                 <div>API Base: {API_BASE_URL}</div>
               </div>
             </div>

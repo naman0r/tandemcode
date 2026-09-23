@@ -4,39 +4,37 @@ import {
   SignInButton,
   UserButton,
 } from "@clerk/clerk-react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Users, Zap } from "lucide-react";
 
 const Header = () => {
-  const navigate = useNavigate();
-
   return (
     <header className="bg-white border-b border-black/[0.5] sticky top-0 z-50 backdrop-blur-md bg-white/50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo & Brand */}
-          <div
+          <Link
+            to="/"
             className="flex items-center space-x-3 cursor-pointer group"
-            onClick={() => navigate("/")}
           >
             <div className="flex items-center justify-center w-40 pt-[1.7] h-10">
               <img src="/tandemcode_logo.png" alt="logos" />
             </div>
-          </div>
+          </Link>
 
           {/* Navigation - Hidden on mobile, shown on larger screens */}
           <nav className="hidden md:flex items-center space-x-8">
             <div className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer">
               <Users className="w-4 h-4" />
-              <a href="/rooms" className="text-sm font-medium">
+              <Link to="/rooms" className="text-sm font-medium">
                 Rooms
-              </a>
+              </Link>
             </div>
             <div className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors cursor-pointer">
               <Zap className="w-4 h-4" />
-              <a href="/problems" className="text-sm font-medium">
+              <Link to="/problems" className="text-sm font-medium">
                 Problems
-              </a>
+              </Link>
             </div>
           </nav>
 
@@ -59,12 +57,12 @@ const Header = () => {
 
             <SignedIn>
               <div className="flex items-center space-x-3">
-                <button
-                  onClick={() => navigate("/dashboard")}
+                <Link
+                  to="/dashboard"
                   className="text-gray-600 hover:text-gray-900 font-medium text-sm transition-colors"
                 >
                   Dashboard
-                </button>
+                </Link>
                 <div className="scale-110 hover:scale-125 transition-transform duration-200">
                   <UserButton
                     appearance={{
