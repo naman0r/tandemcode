@@ -55,6 +55,20 @@ class RoomDAO:
             rows = await conn.fetch(query, user_id)
         return [_map_room(row) for row in rows]
 
+    async def list_for_participant(self, user_id: str, active: bool) -> list[dict]:
+        """Rooms the user created or was ever in, open or closed."""
+        query = f"""
+            {SELECT_ROOM}
+            WHERE r.is_active = $2 AND (
+                r.created_by = $1
+                OR EXISTS (SELECT 1 FROM room_members rm WHERE rm.room_id = r.id AND rm.user_id = $1)
+            )
+            ORDER BY r.created_at DESC
+        """
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(query, user_id, active)
+        return [_map_room(row) for row in rows]
+
     async def exists(self, room_id: str) -> bool:
         query = "SELECT EXISTS(SELECT 1 FROM rooms WHERE id = $1)"
         async with self.pool.acquire() as conn:

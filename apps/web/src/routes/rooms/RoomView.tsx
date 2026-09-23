@@ -285,10 +285,17 @@ const Room = ({ roomId }: { roomId: string }) => {
     return (
       <div className={`${card} mx-auto max-w-md p-8 text-center`}>
         <h1 className="text-lg font-semibold">Room unavailable</h1>
-        <p className={`${muted} mt-1 mb-6 text-sm`}>It may have closed, or the link is wrong.</p>
-        <Link to="/rooms" className={button.primary}>
-          Back to rooms
-        </Link>
+        <p className={`${muted} mt-1 mb-6 text-sm`}>
+          It may have closed, or the link is wrong. If you were in it, the session can be replayed.
+        </p>
+        <div className="flex justify-center gap-2">
+          <Link to={`/rooms/${roomId}/replay`} className={button.secondary}>
+            Replay
+          </Link>
+          <Link to="/rooms" className={button.primary}>
+            Back to rooms
+          </Link>
+        </div>
       </div>
     );
   }

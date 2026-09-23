@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import base64
 from uuid import uuid4
 
 from fastapi import HTTPException, status
 
+from app.dao.events import EventDAO
 from app.dao.problems import ProblemDAO
 from app.dao.room_members import RoomMemberDAO
+from app.dao.room_updates import RoomUpdateDAO
 from app.dao.rooms import RoomDAO
+from app.dao.submissions import SubmissionDAO
 from app.dao.users import UserDAO
 
 
@@ -56,11 +60,17 @@ class RoomService:
         room_member_dao: RoomMemberDAO,
         problem_dao: ProblemDAO,
         user_dao: UserDAO,
+        room_update_dao: RoomUpdateDAO,
+        event_dao: EventDAO,
+        submission_dao: SubmissionDAO,
     ) -> None:
         self.room_dao = room_dao
         self.room_member_dao = room_member_dao
         self.problem_dao = problem_dao
         self.user_dao = user_dao
+        self.room_update_dao = room_update_dao
+        self.event_dao = event_dao
+        self.submission_dao = submission_dao
 
     async def create_room(self, name: str, description: str | None, created_by: str) -> dict:
         # The caller is authenticated but may not have been synced into our users
@@ -83,6 +93,26 @@ class RoomService:
 
     async def list_rooms_by_creator(self, user_id: str) -> list[dict]:
         return await self.room_dao.list_active_by_creator(user_id)
+
+    async def list_my_rooms(self, user_id: str, active: bool) -> list[dict]:
+        return await self.room_dao.list_for_participant(user_id, active)
+
+    async def get_replay(self, room_id: str, caller_id: str) -> dict:
+        """A closed room is readable by the people who were in it, not the world."""
+        room = await self.room_dao.get_by_id(room_id)
+        if not room:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Room not found: {room_id}")
+        if room["createdBy"] != caller_id and not await self.room_member_dao.was_member(room_id, caller_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You were not in this room")
+        return {
+            "room": room,
+            "updates": [
+                {"ts": u["ts"], "data": base64.b64encode(u["data"]).decode()}
+                for u in await self.room_update_dao.list_for_room(room_id)
+            ],
+            "events": await self.event_dao.list_for_room(room_id),
+            "submissions": await self.submission_dao.list_by_room(room_id),
+        }
 
     async def list_room_members(self, room_id: str) -> list[dict]:
         await get_active_room(self.room_dao, room_id)
