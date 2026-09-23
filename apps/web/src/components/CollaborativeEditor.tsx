@@ -39,8 +39,9 @@ const cursorStyles = (awareness: WebsocketProvider["awareness"]): string => {
   const rules: string[] = [];
   awareness.getStates().forEach((state, clientId) => {
     if (clientId === awareness.clientID || !state.user) return;
-    const name = CSS.escape(String((state.user as { name?: unknown }).name ?? ""));
-    const color = colorFor(String(clientId));
+    const peer = state.user as { id?: unknown; name?: unknown };
+    const name = CSS.escape(String(peer.name ?? ""));
+    const color = colorFor(String(peer.id ?? clientId));
     rules.push(
       `.yRemoteSelection-${clientId} { background-color: ${color}33; }`,
       `.yRemoteSelectionHead-${clientId} { position: relative; border-left: 2px solid ${color}; }`,
@@ -146,7 +147,10 @@ const CollaborativeEditor = ({
       provider.on("sync", (synced: boolean) => {
         if (synced) seedStarterCode(ydoc);
       });
-      provider.awareness.setLocalStateField("user", { name: userRef.current.name });
+      provider.awareness.setLocalStateField("user", {
+        id: userRef.current.id,
+        name: userRef.current.name,
+      });
       provider.awareness.on("change", () =>
         setPeerStyles(cursorStyles(provider.awareness)),
       );

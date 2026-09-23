@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 from collections import defaultdict
 
@@ -59,12 +60,17 @@ class YjsRelayManager:
     async def close_user(self, room_id: str, user_id: str) -> None:
         for websocket, owner in list(self.room_sessions.get(room_id, {}).items()):
             if owner == user_id:
-                self.disconnect(websocket, room_id)
-                await websocket.close(code=status.WS_1000_NORMAL_CLOSURE)
+                await self._close(websocket, room_id)
 
     async def close_room(self, room_id: str) -> None:
         for websocket in list(self.room_sessions.get(room_id, {})):
-            self.disconnect(websocket, room_id)
+            await self._close(websocket, room_id)
+        self.recorded_bytes.pop(room_id, None)
+
+    async def _close(self, websocket: WebSocket, room_id: str) -> None:
+        self.disconnect(websocket, room_id)
+        # A peer that dropped a moment ago must not stop the rest being closed.
+        with contextlib.suppress(Exception):
             await websocket.close(code=status.WS_1000_NORMAL_CLOSURE)
 
     async def relay_text(self, room_id: str, sender: WebSocket, message: str) -> None:

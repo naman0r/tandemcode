@@ -44,7 +44,20 @@ class RoomDAO:
         return _map_room(row) if row else None
 
     async def list_active(self, limit: int) -> list[dict]:
-        query = f"{SELECT_ROOM} WHERE r.is_active = TRUE ORDER BY r.created_at DESC LIMIT $1"
+        """Open rooms with someone in them.
+
+        A room only closes when its owner walks out of it empty, so one whose
+        owner closed the tab stays open. Nobody can pair in an empty room, so
+        it is left out of the list rather than crowding it.
+        """
+        query = f"""
+            {SELECT_ROOM}
+            WHERE r.is_active = TRUE AND EXISTS (
+                SELECT 1 FROM room_members rm WHERE rm.room_id = r.id AND rm.left_at IS NULL
+            )
+            ORDER BY r.created_at DESC
+            LIMIT $1
+        """
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(query, limit)
         return [_map_room(row) for row in rows]

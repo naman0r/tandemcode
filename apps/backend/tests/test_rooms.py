@@ -139,6 +139,14 @@ def test_only_the_owner_leaving_closes_an_empty_room(client, room):
     assert client.get(f"/api/rooms/{room['id']}", headers=auth("user_alice")).status_code == 200
 
 
+def test_only_occupied_rooms_are_listed(client, room):
+    listed = lambda: [r["id"] for r in client.get("/api/rooms", headers=auth("user_bob")).json()]  # noqa: E731
+    assert room["id"] not in listed()
+    with connect(client, room["id"], "user_alice") as alice:
+        roster(alice)
+        assert room["id"] in listed()
+
+
 def test_room_creation_is_rate_limited(client, signed_up, monkeypatch):
     monkeypatch.setattr("app.services.rooms.ROOMS_PER_HOUR", 1)
     signed_up("user_dave")
