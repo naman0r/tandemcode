@@ -1,0 +1,94 @@
+# Production: API, runner, Postgres and Caddy on one host. The web app is on
+# Vercel. Run from the repo root:
+#   docker compose -f infra/docker-compose.prod.yml up -d --build
+# Values come from infra/.env (see infra/.env.example).
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: ${DB_NAME:?missing DB_NAME}
+      POSTGRES_USER: ${DB_USER:?missing DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?missing DB_PASSWORD}
+    # No ports: only the API and runner reach it, over the compose network.
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build: ../apps/backend
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      CORS_ORIGINS: ${CORS_ORIGINS:?missing CORS_ORIGINS}
+      CLERK_ISSUER: ${CLERK_ISSUER:?missing CLERK_ISSUER}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:?missing CLERK_SECRET_KEY}
+      RUN_MIGRATIONS_ON_STARTUP: "true"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  runner:
+    build: ../apps/backend
+    command: ["python", "-m", "app.runner"]
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      SANDBOX_IMAGE: python:3.11-slim
+      # gVisor, installed on the host by infra/install-gvisor.sh.
+      SANDBOX_RUNTIME: runsc
+    # Starts one judge container per submission through the host's Docker
+    # socket, which makes it as trusted as the host; it runs only our code.
+    user: "0:0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 512m
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?missing API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  db-data:
+  caddy-data:
+  caddy-config:
