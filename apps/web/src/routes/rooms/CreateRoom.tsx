@@ -54,7 +54,7 @@ const CreateRoomForm = () => {
       </div>
 
       {problem && (
-        <div className="flex items-center justify-between rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm dark:border-indigo-900 dark:bg-indigo-950">
+        <div className="flex items-center justify-between rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm dark:border-orange-900 dark:bg-orange-950">
           <span>
             Problem: <span className="font-medium">{problem.title}</span>
           </span>

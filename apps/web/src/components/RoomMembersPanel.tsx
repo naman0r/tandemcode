@@ -32,7 +32,7 @@ const RoomMembersPanel = ({
                 {image ? (
                   <img src={image} alt="" className="h-8 w-8 rounded-full object-cover" />
                 ) : (
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-sm font-medium text-white">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-500 text-sm font-medium text-zinc-950">
                     {name.charAt(0).toUpperCase()}
                   </span>
                 )}

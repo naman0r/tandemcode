@@ -22,5 +22,5 @@ body {
 }
 
 ::selection {
-  @apply bg-indigo-500 text-white;
+  @apply bg-orange-500 text-zinc-950;
 }

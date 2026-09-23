@@ -117,7 +117,7 @@ const Timeline = ({ replay }: { replay: Replay }) => {
               setPlaying(false);
               setPosition(Number(event.target.value));
             }}
-            className="flex-1 accent-indigo-600"
+            className="flex-1 accent-orange-500"
             aria-label="Position in session"
           />
           <span className={`${muted} w-24 text-right font-mono text-xs`}>
