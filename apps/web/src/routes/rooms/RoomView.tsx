@@ -10,8 +10,9 @@ import { useUser } from "../../hooks/useUser";
 import useWebSocket from "../../hooks/UseWebSocket";
 import type { Submission } from "../../hooks/UseWebSocket";
 import { problemApi, roomApi, submissionApi } from "../../lib/api";
+import type { RoomVisibility } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
-import { badge, button, card, difficulty, muted } from "../../lib/ui";
+import { badge, button, card, difficulty, input, muted } from "../../lib/ui";
 
 type Problem = {
   id: string;
@@ -32,6 +33,8 @@ type Room = {
   createdBy: string;
   createdByName: string | null;
   currentProblemId: string | null;
+  visibility: RoomVisibility;
+  advertised: boolean;
 };
 
 const PENDING_STATUSES = new Set(["pending", "running"]);
@@ -133,6 +136,45 @@ const InviteButton = ({ roomId }: { roomId: string }) => {
       {copied ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
       {copied ? "Copied" : "Copy invite link"}
     </button>
+  );
+};
+
+const ListingControls = ({ room, onChange }: { room: Room; onChange: (room: Room) => void }) => {
+  const [saving, setSaving] = useState(false);
+  const save = async (visibility: RoomVisibility, advertised: boolean) => {
+    setSaving(true);
+    try {
+      onChange(await roomApi.setListing(room.id, { visibility, advertised: visibility === "public" && advertised }));
+    } catch (err) {
+      console.error("Failed to update the room listing:", err);
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <>
+      <select
+        aria-label="Who can find this room"
+        value={room.visibility}
+        disabled={saving}
+        onChange={(event) => save(event.target.value as RoomVisibility, room.advertised)}
+        className={`${input} w-auto`}
+      >
+        <option value="public">Public</option>
+        <option value="unlisted">Unlisted</option>
+      </select>
+      {room.visibility === "public" && (
+        <button
+          type="button"
+          aria-pressed={room.advertised}
+          disabled={saving}
+          onClick={() => save("public", !room.advertised)}
+          className={room.advertised ? button.primary : button.secondary}
+        >
+          {room.advertised ? "Asking for a partner" : "Ask for a partner"}
+        </button>
+      )}
+    </>
   );
 };
 
@@ -238,6 +280,12 @@ const Room = ({ roomId }: { roomId: string }) => {
       .finally(() => setLoading(false));
   }, [roomId]);
 
+  // The server stops advertising once a second person is here; mirror it
+  // rather than refetch the room.
+  useEffect(() => {
+    if (members.length >= 2) setRoom((current) => (current?.advertised ? { ...current, advertised: false } : current));
+  }, [members.length]);
+
   useEffect(() => {
     if (!room?.currentProblemId) {
       setProblem(null);
@@ -307,7 +355,10 @@ const Room = ({ roomId }: { roomId: string }) => {
     <>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{room.name}</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            {room.name}
+            {room.visibility === "unlisted" && <span className={badge(undefined)}>Unlisted</span>}
+          </h1>
           <p className={`${muted} mt-1 text-sm`}>
             {room.description ? `${room.description} · ` : ""}
             opened by {room.createdByName ?? "someone"}
@@ -318,6 +369,7 @@ const Room = ({ roomId }: { roomId: string }) => {
             <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-500" : "bg-amber-500"}`} />
             {isConnected ? "Live" : "Connecting"}
           </span>
+          {isOwner && <ListingControls room={room} onChange={setRoom} />}
           <InviteButton roomId={roomId} />
           <LeaveRoomButton roomId={roomId} />
         </div>

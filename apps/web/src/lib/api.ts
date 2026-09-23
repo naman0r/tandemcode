@@ -22,6 +22,8 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
+export type RoomVisibility = "public" | "unlisted";
+
 export const userApi = {
   // Idempotent: mirrors the caller's Clerk profile into the backend. Email and
   // name come from Clerk server-side, so there is nothing to send.
@@ -44,9 +46,19 @@ export const roomApi = {
     return response.data;
   },
 
-  // creatw a new room:
-  createRoom: async (roomData: { name: string; description: string }) => {
+  createRoom: async (roomData: {
+    name: string;
+    description: string;
+    visibility: RoomVisibility;
+    advertised: boolean;
+  }) => {
     const response = await api.post("/rooms", roomData);
+    return response.data;
+  },
+
+  // Owner only. Advertising needs a public room.
+  setListing: async (roomId: string, listing: { visibility: RoomVisibility; advertised: boolean }) => {
+    const response = await api.put(`/rooms/${roomId}/listing`, listing);
     return response.data;
   },
 

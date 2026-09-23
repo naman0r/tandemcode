@@ -8,6 +8,7 @@ from app.schemas.rooms import (
     ReplayResponse,
     CreateRoomRequest,
     LeaveRoomResponse,
+    RoomListing,
     RoomResponse,
     SetProblemRequest,
     UserInRoomResponse,
@@ -23,7 +24,9 @@ async def create_room(
     user_id: str = Depends(current_user_id),
     service: RoomService = Depends(get_room_service),
 ) -> RoomResponse:
-    room = await service.create_room(payload.name, payload.description, user_id)
+    room = await service.create_room(
+        payload.name, payload.description, user_id, payload.visibility, payload.advertised
+    )
     return RoomResponse.model_validate(room)
 
 
@@ -52,15 +55,6 @@ async def get_replay(
     service: RoomService = Depends(get_room_service),
 ) -> ReplayResponse:
     return ReplayResponse.model_validate(await service.get_replay(room_id, caller_id))
-
-
-@router.get("/user/{user_id}", response_model=list[RoomResponse])
-async def list_rooms_by_creator(
-    user_id: str,
-    service: RoomService = Depends(get_room_service),
-) -> list[RoomResponse]:
-    rooms = await service.list_rooms_by_creator(user_id)
-    return [RoomResponse.model_validate(room) for room in rooms]
 
 
 @router.get("/{room_id}/members", response_model=list[UserInRoomResponse])
@@ -101,6 +95,17 @@ async def set_current_problem(
     service: RoomService = Depends(get_room_service),
 ) -> RoomResponse:
     room = await service.set_current_problem(room_id, payload.problemId, caller_id)
+    return RoomResponse.model_validate(room)
+
+
+@router.put("/{room_id}/listing", response_model=RoomResponse)
+async def set_listing(
+    room_id: str,
+    payload: RoomListing,
+    caller_id: str = Depends(current_user_id),
+    service: RoomService = Depends(get_room_service),
+) -> RoomResponse:
+    room = await service.set_listing(room_id, payload.visibility, payload.advertised, caller_id)
     return RoomResponse.model_validate(room)
 
 

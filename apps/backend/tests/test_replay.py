@@ -15,6 +15,9 @@ def test_editor_changes_are_recorded_but_sync_requests_are_not(client, room):
         alice.receive_bytes()
         alice.send_bytes(UPDATE)
         alice.send_bytes(bytes([1, 0]))  # awareness
+        # Frames are handled in order, so this reply means the update was stored.
+        alice.send_bytes(SYNC_STEP1)
+        alice.receive_bytes()
 
     replay = client.get(f"/api/rooms/{room['id']}/replay", headers=auth("user_alice")).json()
     assert [base64.b64decode(u["data"]) for u in replay["updates"]] == [UPDATE]
