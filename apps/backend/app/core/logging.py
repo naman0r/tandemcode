@@ -26,4 +26,7 @@ class RedactTokens(logging.Filter):
 
 
 def install() -> None:
-    logging.getLogger("uvicorn.access").addFilter(RedactTokens())
+    # Accepted handshakes go to the access logger; refused ones to the error
+    # logger, still with the full URL.
+    for name in ("uvicorn.access", "uvicorn.error"):
+        logging.getLogger(name).addFilter(RedactTokens())
