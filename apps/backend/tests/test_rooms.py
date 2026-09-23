@@ -304,3 +304,20 @@ def test_one_user_cannot_hold_sockets_across_unlimited_rooms(client, room):
             with connect(client, rooms[-1]["id"], "user_alice"):
                 pass
 
+
+def test_room_creation_limit_holds_under_parallel_requests(client, signed_up):
+    import asyncio
+    from uuid import uuid4
+
+    from app.dao.rooms import RoomDAO
+
+    signed_up("user_grace")
+    dao = RoomDAO(client.app.state.db_pool)
+
+    async def burst():
+        return await asyncio.gather(
+            *(dao.create(str(uuid4()), "r", None, "user_grace", "public", False, 3, 30) for _ in range(20))
+        )
+
+    assert sum(room is not None for room in client.portal.call(burst)) == 3
+
