@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { UserPlus } from "lucide-react";
 import Layout from "../../components/Layout";
 import RequireSignIn from "../../components/RequireSignIn";
 import RoomChatComponent from "../../components/RoomChatComponent";
@@ -12,7 +13,7 @@ import type { Submission } from "../../hooks/UseWebSocket";
 import { problemApi, roomApi, submissionApi } from "../../lib/api";
 import type { RoomVisibility } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
-import { badge, button, card, difficulty, input, muted } from "../../lib/ui";
+import { badge, button, card, difficulty, muted } from "../../lib/ui";
 
 type Problem = {
   id: string;
@@ -126,6 +127,8 @@ const RunHistory = ({
 
 // Asking for a partner only means something while you are alone, so the
 // button is not offered once someone has joined.
+const VISIBILITIES: RoomVisibility[] = ["public", "unlisted"];
+
 const ListingControls = ({
   room,
   alone,
@@ -148,25 +151,47 @@ const ListingControls = ({
   };
   return (
     <>
-      <select
+      <div
+        role="radiogroup"
         aria-label="Who can find this room"
-        value={room.visibility}
-        disabled={saving}
-        onChange={(event) => save(event.target.value as RoomVisibility, room.advertised)}
-        className={`${input} w-auto`}
+        className="inline-flex shrink-0 rounded-lg border border-zinc-300 bg-white p-0.5 dark:border-zinc-700 dark:bg-zinc-900"
       >
-        <option value="public">Public</option>
-        <option value="unlisted">Unlisted</option>
-      </select>
+        {VISIBILITIES.map((visibility) => (
+          <button
+            key={visibility}
+            type="button"
+            role="radio"
+            aria-checked={room.visibility === visibility}
+            disabled={saving}
+            onClick={() => visibility !== room.visibility && save(visibility, room.advertised)}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors disabled:cursor-not-allowed ${
+              room.visibility === visibility
+                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
+                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            }`}
+          >
+            {visibility}
+          </button>
+        ))}
+      </div>
       {room.visibility === "public" && alone && (
         <button
           type="button"
           aria-pressed={room.advertised}
           disabled={saving}
           onClick={() => save("public", !room.advertised)}
-          className={room.advertised ? button.primary : button.secondary}
+          title={room.advertised ? "Stop asking" : "Highlight this room on the rooms page"}
+          className={room.advertised ? button.active : button.secondary}
         >
-          {room.advertised ? "Asking for a partner" : "Ask for a partner"}
+          {room.advertised ? (
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
+            </span>
+          ) : (
+            <UserPlus className="h-4 w-4" />
+          )}
+          {room.advertised ? "Looking for a partner" : "Ask for a partner"}
         </button>
       )}
     </>
@@ -219,7 +244,10 @@ const ProblemPicker = ({
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-3 dark:border-zinc-800">
-          <h2 className="font-semibold">Choose a problem</h2>
+          <div>
+            <h2 className="font-semibold">Choose a problem</h2>
+            <p className={`${muted} text-xs`}>The editor switches to the new problem's starter code.</p>
+          </div>
           <button type="button" onClick={onClose} className={button.ghost}>
             Close
           </button>
@@ -353,7 +381,7 @@ const Room = ({ roomId }: { roomId: string }) => {
             opened by {room.createdByName ?? "someone"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <span className={`${muted} mr-2 flex items-center gap-1.5 text-xs`}>
             <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-500" : "bg-amber-500"}`} />
             {isConnected ? "Live" : "Connecting"}
@@ -383,7 +411,9 @@ const Room = ({ roomId }: { roomId: string }) => {
               <CollaborativeEditor
                 roomId={roomId}
                 user={{ id: user.id, name: user.name || "Someone" }}
+                problemId={problem?.id}
                 starterCode={problem?.starterCode}
+                replacesOnProblemChange={isOwner}
                 onCodeChange={setCode}
               />
             )}

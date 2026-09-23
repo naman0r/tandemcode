@@ -12,7 +12,7 @@ def test_seeded_problem_exposes_statement_and_samples_only(client, signed_up):
     problem = response.json()
 
     assert "indices" in problem["statement"]
-    assert problem["starterCode"].startswith("import sys")
+    assert "def twoSum(self, nums: List[int], target: int) -> List[int]:" in problem["starterCode"]
     assert problem["samples"] == [
         {"input": "2 7 11 15\n9\n", "expected": "0 1"},
         {"input": "3 2 4\n6\n", "expected": "1 2"},
@@ -35,5 +35,8 @@ def test_every_problem_is_complete(client, signed_up):
     for problem in problems:
         assert problem["difficulty"] in {"easy", "medium", "hard"}, problem["slug"]
         assert problem["statement"], problem["slug"]
-        assert problem["starterCode"], problem["slug"]
+        # A function to fill in, not a script: the starter is a class with
+        # a documented method, and it must at least compile.
+        assert "class Solution" in problem["starterCode"] or "class Codec" in problem["starterCode"], problem["slug"]
+        compile(problem["starterCode"], problem["slug"], "exec")
         assert len(problem["samples"]) >= 2, problem["slug"]
