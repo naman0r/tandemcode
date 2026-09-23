@@ -1,0 +1,12 @@
+# TLS certificates are issued and renewed automatically for the API domain.
+# There is no `log` directive on purpose: the websocket token travels in the
+# query string, and Caddy writes no access log unless told to.
+{$API_DOMAIN} {
+	encode gzip
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+	reverse_proxy api:8080
+}

@@ -27,7 +27,7 @@ hidden tests.
 | Web | React 19, Vite, TypeScript, Tailwind, Monaco, Yjs, Clerk |
 | API | FastAPI on Python 3.11, asyncpg, raw JSON over websockets |
 | Runner | Same image as the API, `python -m app.runner` |
-| Database | Postgres 13, forward-only SQL migrations in `apps/backend/migrations` |
+| Database | Postgres 17 in production and CI (13 in the local compose), forward-only SQL migrations in `apps/backend/migrations` |
 | CI | pytest with a Postgres service; web lint and build |
 
 ## Layout
@@ -51,6 +51,7 @@ apps/
       hooks/       room websocket
       lib/         API client, auth, config
 docs/history/      notes from the Spring Boot version
+infra/             production compose, Caddy, host scripts
 ```
 
 Requests flow routes to services to dao. Authentication happens at the HTTP
@@ -122,6 +123,11 @@ sets it, and `infra/install-gvisor.sh` installs it on an Ubuntu host.
 
 The runner reaches Docker through the host's socket, so the runner itself is
 as trusted as the host. Keep it on a machine that runs nothing else.
+
+## Deploy
+
+One Lightsail host for the API, runner and Postgres, and Vercel for the web
+app. `docs/deploy.md` has every step.
 
 ## Contributing
 
