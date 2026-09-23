@@ -20,6 +20,30 @@ export interface RoomMember {
 
 export type ConnectionState = "connecting" | "connected" | "disconnected";
 
+export interface TestOutcome {
+  index: number;
+  hidden: boolean;
+  passed: boolean;
+  timeMs: number;
+  stdout: string;
+  stderr: string;
+}
+
+export interface Submission {
+  id: string;
+  userId: string;
+  userName: string | null;
+  status: string;
+  createdAt: string;
+  result: { passed: number; total: number; timeMs: number; tests: TestOutcome[] } | null;
+}
+
+// Newest first; a submission arrives once as pending and again judged.
+const upsert = (list: Submission[], next: Submission): Submission[] => {
+  const rest = list.filter((item) => item.id !== next.id);
+  return [next, ...rest].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+};
+
 // Backoff for an unexpected drop. Bounded: a handshake the server refuses on
 // policy will never start succeeding, so retrying forever just spins.
 const RECONNECT_DELAYS_MS = [1000, 2000, 5000, 10000];
@@ -35,6 +59,7 @@ const useWebSocket = (roomId: string) => {
     useState<ConnectionState>("connecting");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [members, setMembers] = useState<RoomMember[]>([]);
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
 
   const { getToken, userId } = useAuth();
   const getTokenRef = useRef(getToken);
@@ -101,6 +126,11 @@ const useWebSocket = (roomId: string) => {
           return;
         }
 
+        if (payload.type === "submission") {
+          setSubmissions((prev) => upsert(prev, payload.submission));
+          return;
+        }
+
         if (payload.type === "chat") {
           setMessages((prev) => [
             ...prev,
@@ -150,6 +180,11 @@ const useWebSocket = (roomId: string) => {
     connectionState,
     messages,
     members,
+    submissions,
+    // The socket only carries what happens while it is open; the room loads
+    // history through this and reloads it after a reconnect.
+    seedSubmissions: (history: Submission[]) =>
+      setSubmissions((prev) => history.reduce(upsert, prev)),
     sendMessage,
   };
 };

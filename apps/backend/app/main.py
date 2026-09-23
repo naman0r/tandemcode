@@ -17,6 +17,7 @@ from app.routes.submissions import router as submissions_router
 from app.routes.users import router as users_router
 from app.websocket.auth import Participant, room_participant
 from app.websocket.room_chat import RoomChatManager
+from app.websocket.verdicts import VerdictListener
 from app.websocket.yjs import YjsRelayManager
 
 logging.basicConfig(level=logging.INFO)
@@ -29,9 +30,12 @@ async def lifespan(app: FastAPI):
     app.state.db_pool = await create_pool()
     app.state.room_chat_manager = RoomChatManager()
     app.state.yjs_relay_manager = YjsRelayManager()
+    verdicts = VerdictListener(app.state.db_pool, app.state.room_chat_manager)
+    await verdicts.start()
     try:
         yield
     finally:
+        await verdicts.stop()
         await app.state.db_pool.close()
 
 
