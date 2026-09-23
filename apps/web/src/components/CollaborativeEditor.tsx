@@ -11,7 +11,12 @@ import { useTheme } from "../lib/theme";
 interface Props {
   roomId: string;
   user: { id: string; name: string };
+  problemId?: string | null;
   starterCode?: string | null;
+  // Only the owner can change the problem, so only the owner's client swaps
+  // the text; everyone else receives the swap through the document. Two
+  // clients swapping at once would merge into two copies of the starter.
+  replacesOnProblemChange: boolean;
   onCodeChange: (code: string) => void;
 }
 
@@ -63,7 +68,9 @@ const TOKEN_REFRESH_MS = 30_000;
 const CollaborativeEditor = ({
   roomId,
   user,
+  problemId,
   starterCode,
+  replacesOnProblemChange,
   onCodeChange,
 }: Props) => {
   const { getToken, isLoaded, isSignedIn, sessionId } = useAuth();
@@ -90,6 +97,9 @@ const CollaborativeEditor = ({
   // syncs their text instead and leaves it alone. Once per document: a
   // reconnect after someone cleared the editor must not put it back.
   const seededRef = useRef(false);
+  // The problem the text was written for. Switching problems replaces the
+  // text with the new starter, since code for the old problem is no use.
+  const shownProblemRef = useRef<string | null>(null);
   const seedStarterCode = (ydoc: Y.Doc) => {
     const starter = starterCodeRef.current;
     const ytext = ydoc.getText("code");
@@ -132,6 +142,7 @@ const CollaborativeEditor = ({
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
     seededRef.current = false;
+    shownProblemRef.current = null;
 
     let cancelled = false;
     let refresh: ReturnType<typeof setInterval> | undefined;
@@ -183,10 +194,22 @@ const CollaborativeEditor = ({
   }, [roomId, isLoaded, isSignedIn, sessionId]);
 
   useEffect(() => {
-    if (ydocRef.current && providerRef.current?.synced) {
-      seedStarterCode(ydocRef.current);
+    const previous = shownProblemRef.current;
+    shownProblemRef.current = problemId ?? null;
+    const ydoc = ydocRef.current;
+    if (!ydoc || !providerRef.current?.synced) return;
+
+    if (replacesOnProblemChange && previous && problemId && previous !== problemId && starterCode) {
+      const ytext = ydoc.getText("code");
+      ydoc.transact(() => {
+        ytext.delete(0, ytext.length);
+        ytext.insert(0, starterCode);
+      });
+      seededRef.current = true;
+      return;
     }
-  }, [starterCode]);
+    seedStarterCode(ydoc);
+  }, [problemId, starterCode, replacesOnProblemChange]);
 
   const handleMount: OnMount = (editor) => {
     editorRef.current = editor;

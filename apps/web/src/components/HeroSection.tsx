@@ -1,6 +1,6 @@
 import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
-import { ArrowRight, CheckCircle2, Code2, History, Users, Zap } from "lucide-react";
+import { ArrowRight, CheckCircle2, Code2, Github, History, Users, Zap } from "lucide-react";
 import { button, muted } from "../lib/ui";
 
 const FEATURES = [
@@ -29,9 +29,18 @@ const HeroSection = () => (
 
     <div className="grid items-center gap-16 py-16 lg:grid-cols-2 lg:py-28">
       <div className="max-w-2xl">
-        <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-sm font-medium text-orange-700 dark:bg-orange-950 dark:text-orange-300">
-          <Zap className="h-4 w-4" />
-          Real-time collaboration
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-sm font-medium text-orange-700 dark:bg-orange-950 dark:text-orange-300">
+            <Zap className="h-4 w-4" />
+            Real-time collaboration
+          </span>
+          <a
+            href="https://github.com/naman0r/tandemcode"
+            className="inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          >
+            <Github className="h-4 w-4" />
+            Free and open source
+          </a>
         </div>
 
         <h1 className="text-4xl font-bold leading-tight tracking-tight lg:text-6xl">

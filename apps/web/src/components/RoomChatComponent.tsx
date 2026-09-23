@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { SendHorizontal } from "lucide-react";
+import { ArrowUp } from "lucide-react";
 import type { ChatMessage } from "../hooks/UseWebSocket";
-import { button, card, input, muted } from "../lib/ui";
+import { card, input, muted } from "../lib/ui";
 
 interface Props {
   isConnected: boolean;
@@ -56,9 +56,9 @@ const RoomChatComponent = ({ isConnected, messages, sendMessage }: Props) => {
         <div ref={endRef} />
       </div>
 
-      <form onSubmit={submit} className="flex gap-2 border-t border-zinc-200 p-3 dark:border-zinc-800">
+      <form onSubmit={submit} className="relative border-t border-zinc-200 p-3 dark:border-zinc-800">
         <input
-          className={input}
+          className={`${input} pr-11`}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={isConnected ? "Message" : "Connecting..."}
@@ -68,9 +68,9 @@ const RoomChatComponent = ({ isConnected, messages, sendMessage }: Props) => {
           type="submit"
           disabled={!draft.trim() || !isConnected}
           aria-label="Send"
-          className={`${button.primary} px-3`}
+          className="absolute top-1/2 right-5 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-orange-500 text-zinc-950 transition-colors hover:bg-orange-400 disabled:cursor-default disabled:bg-zinc-200 disabled:text-zinc-400 dark:disabled:bg-zinc-800 dark:disabled:text-zinc-500"
         >
-          <SendHorizontal className="h-4 w-4" />
+          <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
         </button>
       </form>
     </section>

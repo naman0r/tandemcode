@@ -17,26 +17,6 @@ from tests.rig import auth
 
 SOLUTIONS = sorted((Path(__file__).parent / "solutions").glob("*.py"))
 
-# The original problems predate this check. New problems must bring a
-# solution; delete a slug from here when its solution is added.
-# ponytail: shrinks as solutions land; drop the set once it is empty.
-WITHOUT_SOLUTIONS = {
-    "best-time-to-buy-sell-stock",
-    "climbing-stairs",
-    "coin-change",
-    "container-with-most-water",
-    "longest-substring-no-repeat",
-    "median-two-sorted-arrays",
-    "merge-intervals",
-    "reverse-linked-list",
-    "serialize-deserialize-tree",
-    "three-sum",
-    "trapping-rain-water",
-    "two-sum",
-    "valid-parentheses",
-    "word-search",
-}
-
 
 @pytest.mark.parametrize("solution", SOLUTIONS, ids=[path.stem for path in SOLUTIONS])
 def test_reference_solution_passes_every_test(client, solution):
@@ -55,5 +35,14 @@ def test_reference_solution_passes_every_test(client, solution):
 def test_every_problem_has_a_reference_solution(client, signed_up):
     signed_up("user_alice")
     slugs = {problem["slug"] for problem in client.get("/api/problems", headers=auth("user_alice")).json()}
-    missing = slugs - {path.stem for path in SOLUTIONS} - WITHOUT_SOLUTIONS
+    missing = slugs - {path.stem for path in SOLUTIONS}
     assert not missing, f"add tests/solutions/<slug>.py for: {sorted(missing)}"
+
+
+def test_untouched_starter_code_never_passes(client):
+    """The starter is a stub to fill in. One that passed would be a solution."""
+    dao = ProblemDAO(client.app.state.db_pool)
+    for problem in client.portal.call(dao.list_all):
+        spec = client.portal.call(dao.get_judge_spec, problem["id"])
+        verdict = judge(problem["starterCode"], spec["tests"], spec["timeLimitMs"], spec["memLimitMb"])
+        assert verdict.status != ACCEPTED, problem["slug"]
