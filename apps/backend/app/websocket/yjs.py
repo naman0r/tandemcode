@@ -1,16 +1,14 @@
 from __future__ import annotations
 
 import contextlib
-import logging
 from collections import defaultdict
 
 from fastapi import WebSocket, WebSocketException, status
 
 from app.dao.room_members import RoomMemberDAO
 from app.dao.room_updates import RoomUpdateDAO
+from app.websocket.fanout import fan_out
 from app.websocket.room_chat import MAX_SOCKETS_PER_USER
-
-logger = logging.getLogger(__name__)
 
 # y-websocket clients open with SyncStep1 and only consider themselves synced
 # once a SyncStep2 comes back. A peer answers that when there is one; when the
@@ -38,6 +36,8 @@ class YjsRelayManager:
         # Socket to the user it belongs to, so a leave can close that user's.
         self.room_sessions: dict[str, dict[WebSocket, str]] = defaultdict(dict)
         self.updates = updates
+        # Sockets that stopped taking frames; skipped until they disconnect.
+        self.stalled: set[WebSocket] = set()
 
     async def connect(
         self, websocket: WebSocket, room_id: str, user_id: str, room_member_dao: RoomMemberDAO
@@ -52,6 +52,7 @@ class YjsRelayManager:
         self.room_sessions[room_id][websocket] = user_id
 
     def disconnect(self, websocket: WebSocket, room_id: str) -> None:
+        self.stalled.discard(websocket)
         sessions = self.room_sessions.get(room_id)
         if not sessions:
             return
@@ -74,14 +75,11 @@ class YjsRelayManager:
         with contextlib.suppress(Exception):
             await websocket.close(code=status.WS_1000_NORMAL_CLOSURE)
 
+    def _peers(self, room_id: str, sender: WebSocket) -> list[WebSocket]:
+        return [session for session in self.room_sessions.get(room_id, {}) if session is not sender]
+
     async def relay_text(self, room_id: str, sender: WebSocket, message: str) -> None:
-        for session in list(self.room_sessions.get(room_id, {})):
-            if session is sender:
-                continue
-            try:
-                await session.send_text(message)
-            except Exception:
-                logger.exception("Failed to relay Yjs text message for room %s", room_id)
+        await fan_out(self._peers(room_id, sender), lambda session: session.send_text(message), self.stalled)
 
     async def relay_bytes(self, room_id: str, sender: WebSocket, payload: bytes) -> None:
         if len(payload) > MAX_FRAME_BYTES:
@@ -90,13 +88,7 @@ class YjsRelayManager:
         if sessions == [sender] and payload.startswith(SYNC_STEP1_PREFIX):
             await sender.send_bytes(EMPTY_SYNC_STEP2)
             return
-        for session in sessions:
-            if session is sender:
-                continue
-            try:
-                await session.send_bytes(payload)
-            except Exception:
-                logger.exception("Failed to relay Yjs binary message for room %s", room_id)
+        await fan_out(self._peers(room_id, sender), lambda session: session.send_bytes(payload), self.stalled)
         # After the relay so a slow disk never delays a keystroke reaching a peer.
         if payload.startswith(DOCUMENT_CHANGE_PREFIXES):
             await self.updates.record(room_id, payload, MAX_RECORDED_BYTES_PER_ROOM)
