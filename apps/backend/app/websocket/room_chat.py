@@ -7,6 +7,7 @@ from collections import defaultdict, deque
 from datetime import datetime, timezone
 
 from fastapi import WebSocket, WebSocketException, status
+from fastapi.encoders import jsonable_encoder
 
 from app.dao.events import EventDAO
 from app.dao.room_members import RoomMemberDAO
@@ -187,8 +188,9 @@ class RoomChatManager:
         await self.broadcast(room_id, {"type": "presence", "members": members})
 
     async def broadcast(self, room_id: str, event: dict) -> None:
-        # default=str renders datetimes and UUIDs.
-        message = json.dumps(event, default=str)
+        # The same encoder as HTTP responses: clients sort runs by comparing
+        # createdAt strings, so both paths must render datetimes identically.
+        message = json.dumps(jsonable_encoder(event))
         for session in list(self.room_sessions.get(room_id, {})):
             try:
                 await session.send_text(message)
