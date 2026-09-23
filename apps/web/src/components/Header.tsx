@@ -44,12 +44,11 @@ const Header = () => {
           <div className="flex items-center space-x-4">
             <SignedOut>
               <div className="flex items-center space-x-3">
-                <button
-                  onClick={() => navigate("/sign-in")}
-                  className="text-gray-600 hover:text-gray-900 font-medium text-sm transition-colors"
-                >
-                  Sign In
-                </button>
+                <SignInButton mode="modal">
+                  <button className="text-gray-600 hover:text-gray-900 font-medium text-sm transition-colors">
+                    Sign In
+                  </button>
+                </SignInButton>
                 <SignInButton mode="modal">
                   <button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-4 py-2 rounded-lg font-medium text-sm transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
                     Get Started
