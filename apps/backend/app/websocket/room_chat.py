@@ -12,6 +12,7 @@ from fastapi.encoders import jsonable_encoder
 from app.dao.events import EventDAO
 from app.dao.room_members import RoomMemberDAO
 from app.websocket.auth import Participant
+from app.websocket.fanout import fan_out
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,8 @@ class RoomChatManager:
         # Per user, so opening more sockets does not buy more messages.
         # ponytail: never pruned, one small deque per user who ever chatted.
         self.recent_sends: dict[str, deque[float]] = defaultdict(deque)
+        # Sockets that stopped taking frames; skipped until they are forgotten.
+        self.stalled: set[WebSocket] = set()
 
     async def join(
         self,
@@ -177,6 +180,7 @@ class RoomChatManager:
         return True
 
     def _forget(self, websocket: WebSocket, room_id: str) -> Participant | None:
+        self.stalled.discard(websocket)
         sessions = self.room_sessions.get(room_id)
         if sessions is None:
             return None
@@ -205,8 +209,8 @@ class RoomChatManager:
         # The same encoder as HTTP responses: clients sort runs by comparing
         # createdAt strings, so both paths must render datetimes identically.
         message = json.dumps(jsonable_encoder(event))
-        for session in list(self.room_sessions.get(room_id, {})):
-            try:
-                await session.send_text(message)
-            except Exception:
-                logger.exception("Failed to send to a socket in room %s", room_id)
+        await fan_out(
+            list(self.room_sessions.get(room_id, {})),
+            lambda session: session.send_text(message),
+            self.stalled,
+        )
