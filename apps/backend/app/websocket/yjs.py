@@ -7,6 +7,13 @@ from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 
+# y-websocket clients open with SyncStep1 and only consider themselves synced
+# once a SyncStep2 comes back. A peer answers that when there is one; when the
+# client is alone, nobody would, so the relay answers for the empty document
+# it does not keep. Both are the messageSync envelope followed by the step.
+SYNC_STEP1_PREFIX = b"\x00\x00"
+EMPTY_SYNC_STEP2 = b"\x00\x01\x02\x00\x00"
+
 
 class YjsRelayManager:
     def __init__(self) -> None:
@@ -34,7 +41,11 @@ class YjsRelayManager:
                 logger.exception("Failed to relay Yjs text message for room %s", room_id)
 
     async def relay_bytes(self, room_id: str, sender: WebSocket, payload: bytes) -> None:
-        for session in list(self.room_sessions.get(room_id, set())):
+        sessions = list(self.room_sessions.get(room_id, set()))
+        if sessions == [sender] and payload.startswith(SYNC_STEP1_PREFIX):
+            await sender.send_bytes(EMPTY_SYNC_STEP2)
+            return
+        for session in sessions:
             if session is sender:
                 continue
             try:

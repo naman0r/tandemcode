@@ -16,6 +16,9 @@ type Problem = {
   difficulty: string;
   timeLimitMs: number;
   memLimitMb: number;
+  statement: string | null;
+  starterCode: string | null;
+  samples: { input: string; expected: string }[];
 };
 
 type Submission = {
@@ -323,6 +326,7 @@ const RoomView = () => {
               <CollaborativeEditor
                 roomId={roomId || ""}
                 language={language}
+                starterCode={currentProblem?.starterCode}
                 onCodeChange={setCode}
               />
 
@@ -376,8 +380,30 @@ const RoomView = () => {
               </div>
 
               {currentProblem ? (
-                <div className="prose prose-sm max-w-none">
-                  <p className="text-gray-600 text-sm">
+                <div className="space-y-4 text-sm">
+                  <p className="text-gray-800 whitespace-pre-line">
+                    {currentProblem.statement ??
+                      "This problem has no statement yet."}
+                  </p>
+                  {currentProblem.samples.map((sample, index) => (
+                    <div key={index} className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-gray-500 mb-1">
+                          Sample input {index + 1}
+                        </p>
+                        <pre className="bg-gray-50 border border-gray-200 rounded p-2 whitespace-pre-wrap">
+                          {sample.input}
+                        </pre>
+                      </div>
+                      <div>
+                        <p className="text-gray-500 mb-1">Expected output</p>
+                        <pre className="bg-gray-50 border border-gray-200 rounded p-2 whitespace-pre-wrap">
+                          {sample.expected}
+                        </pre>
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-gray-600">
                     Time limit: {currentProblem.timeLimitMs}ms · Memory:{" "}
                     {currentProblem.memLimitMb}MB
                   </p>
