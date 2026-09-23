@@ -33,7 +33,9 @@ class RoomChatManager:
     def __init__(self, events: EventDAO) -> None:
         self.room_sessions: dict[str, dict[WebSocket, Participant]] = defaultdict(dict)
         self.events = events
-        self.recent_sends: dict[WebSocket, deque[float]] = defaultdict(deque)
+        # Per user, so opening more sockets does not buy more messages.
+        # ponytail: never pruned, one small deque per user who ever chatted.
+        self.recent_sends: dict[str, deque[float]] = defaultdict(deque)
 
     async def join(
         self,
@@ -117,7 +119,7 @@ class RoomChatManager:
         text = incoming.get("text")
         if not isinstance(text, str) or not text.strip() or len(text) > MAX_CHAT_CHARS:
             return
-        if not self._within_rate(websocket):
+        if not self._within_rate(sender.user_id):
             return
 
         message = {
@@ -151,9 +153,9 @@ class RoomChatManager:
 
         await self._broadcast_presence(room_id, room_member_dao)
 
-    def _within_rate(self, websocket: WebSocket) -> bool:
+    def _within_rate(self, user_id: str) -> bool:
         now = time.monotonic()
-        sends = self.recent_sends[websocket]
+        sends = self.recent_sends[user_id]
         while sends and now - sends[0] > CHAT_WINDOW_SECONDS:
             sends.popleft()
         if len(sends) >= CHAT_BURST:
@@ -162,7 +164,6 @@ class RoomChatManager:
         return True
 
     def _forget(self, websocket: WebSocket, room_id: str) -> Participant | None:
-        self.recent_sends.pop(websocket, None)
         sessions = self.room_sessions.get(room_id)
         if sessions is None:
             return None

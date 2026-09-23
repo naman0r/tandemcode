@@ -29,11 +29,6 @@ export const userApi = {
     const response = await api.post("/users");
     return response.data;
   },
-
-  getUser: async (id: string) => {
-    const response = await api.get(`/users/${id}`);
-    return response.data;
-  },
 };
 
 export const roomApi = {

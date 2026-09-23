@@ -94,10 +94,12 @@ async def room_websocket(
 async def yjs_websocket(
     websocket: WebSocket,
     room_id: str,
-    _participant: Participant = Depends(room_participant),
+    participant: Participant = Depends(room_participant),
 ) -> None:
     manager: YjsRelayManager = websocket.app.state.yjs_relay_manager
-    await manager.connect(websocket, room_id)
+    await manager.connect(
+        websocket, room_id, participant.user_id, RoomMemberDAO(websocket.app.state.db_pool)
+    )
 
     try:
         while True:

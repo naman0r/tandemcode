@@ -24,8 +24,10 @@ POLL_SECONDS = 1.0
 
 # With an image set, every submission runs in its own container with no
 # network. Unset, the judge runs in this process: fine for tests and for
-# development without a Docker socket, not for strangers' code.
+# development without a Docker socket, not for strangers' code, so the runner
+# refuses to start that way unless told to.
 SANDBOX_IMAGE = os.getenv("SANDBOX_IMAGE")
+ALLOW_UNSANDBOXED = os.getenv("ALLOW_UNSANDBOXED", "").lower() in {"1", "true", "yes"}
 
 
 def run_judge(code: str, tests: list[dict], time_limit_ms: int, mem_limit_mb: int) -> Verdict:
@@ -51,7 +53,14 @@ async def judge_next(submissions: SubmissionDAO, problems: ProblemDAO) -> bool:
         logger.exception("Judge failed for submission %s", submission["id"])
         verdict = Verdict(status=RUNTIME_ERROR, timeMs=0, passed=0, total=0)
 
-    await submissions.complete(submission["id"], verdict.status, verdict.timeMs, verdict.as_dict())
+    try:
+        await submissions.complete(submission["id"], verdict.status, verdict.timeMs, verdict.as_dict())
+    except Exception:
+        # Left running, the row would be requeued on restart and fail the
+        # same way forever. The bare verdict carries no program output.
+        logger.exception("Could not store the verdict for submission %s", submission["id"])
+        verdict = Verdict(status=RUNTIME_ERROR, timeMs=0, passed=0, total=0)
+        await submissions.complete(submission["id"], verdict.status, verdict.timeMs, verdict.as_dict())
     logger.info("Submission %s: %s", submission["id"], verdict.status)
     return True
 
@@ -61,8 +70,10 @@ async def main() -> None:
     if SANDBOX_IMAGE:
         await asyncio.to_thread(functools.partial(sandbox.pull, SANDBOX_IMAGE))
         logger.info("Submissions run in %s containers with no network", SANDBOX_IMAGE)
-    else:
+    elif ALLOW_UNSANDBOXED:
         logger.warning("SANDBOX_IMAGE is not set: submissions run in this process")
+    else:
+        raise SystemExit("SANDBOX_IMAGE is not set. Set ALLOW_UNSANDBOXED=1 to judge in this process.")
     pool = await create_pool()
     submissions, problems = SubmissionDAO(pool), ProblemDAO(pool)
     # Rows left "running" by a runner that died mid-judge would never be

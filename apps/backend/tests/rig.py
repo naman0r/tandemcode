@@ -28,8 +28,12 @@ _jwk.update(kid=_KID, use="sig", alg="RS256")
 _JWKS = json.dumps({"keys": [_jwk]}).encode()
 
 
+JWKS_FETCHES = []
+
+
 class _JwksHandler(BaseHTTPRequestHandler):
     def do_GET(self):
+        JWKS_FETCHES.append(time.time())
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(_JWKS)))
@@ -54,7 +58,7 @@ os.environ["RUN_MIGRATIONS_ON_STARTUP"] = "true"
 
 
 
-def token(sub: str = "user_alice", azp: str = ORIGIN, ttl: int = 300, **claims) -> str:
+def token(sub: str = "user_alice", azp: str = ORIGIN, ttl: int = 300, kid: str = _KID, **claims) -> str:
     """A session token that our fake Clerk will vouch for."""
     now = int(time.time())
     payload = {
@@ -70,7 +74,7 @@ def token(sub: str = "user_alice", azp: str = ORIGIN, ttl: int = 300, **claims) 
         {k: v for k, v in payload.items() if v is not None},
         _key,
         algorithm="RS256",
-        headers={"kid": _KID},
+        headers={"kid": kid},
     )
 
 

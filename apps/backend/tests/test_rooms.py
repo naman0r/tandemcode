@@ -130,6 +130,31 @@ def test_leaving_an_empty_room_closes_it_without_losing_data(client, room):
     assert room["id"] not in [r["id"] for r in client.get("/api/rooms", headers=auth("user_alice")).json()]
 
 
+def test_only_the_owner_leaving_closes_an_empty_room(client, room):
+    """Otherwise anyone could close an idle room by joining it and leaving."""
+    with connect(client, room["id"], "user_bob"):
+        response = client.post(f"/api/rooms/{room['id']}/leave", headers=auth("user_bob"))
+        assert response.json() == {"roomClosed": False}
+
+    assert client.get(f"/api/rooms/{room['id']}", headers=auth("user_alice")).status_code == 200
+
+
+def test_only_occupied_rooms_are_listed(client, room):
+    listed = lambda: [r["id"] for r in client.get("/api/rooms", headers=auth("user_bob")).json()]  # noqa: E731
+    assert room["id"] not in listed()
+    with connect(client, room["id"], "user_alice") as alice:
+        roster(alice)
+        assert room["id"] in listed()
+
+
+def test_room_creation_is_rate_limited(client, signed_up, monkeypatch):
+    monkeypatch.setattr("app.services.rooms.ROOMS_PER_HOUR", 1)
+    signed_up("user_dave")
+    create = lambda: client.post("/api/rooms", json={"name": "r"}, headers=auth("user_dave"))  # noqa: E731
+    assert create().status_code == 200
+    assert create().status_code == 429
+
+
 def test_a_closed_room_refuses_new_sockets(client, room):
     """The join path checks room state under the same lock that closes it."""
     with connect(client, room["id"], "user_alice"):

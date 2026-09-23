@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import base64
 
+from app.dao.room_updates import RoomUpdateDAO
 from tests.rig import auth, next_chat, room_socket, roster
 from tests.test_yjs import SYNC_STEP1, UPDATE, yjs_socket
 
 
 def test_editor_changes_are_recorded_but_sync_requests_are_not(client, room):
-    with yjs_socket(client, room["id"], "user_alice") as alice:
+    with room_socket(client, room["id"], "user_alice"), yjs_socket(client, room["id"], "user_alice") as alice:
         alice.send_bytes(SYNC_STEP1)
         alice.receive_bytes()
         alice.send_bytes(UPDATE)
@@ -41,6 +42,16 @@ def test_a_closed_room_is_replayable_by_those_who_were_there(client, room):
 
     client.post("/api/users", headers=auth("user_carol"))
     assert client.get(f"/api/rooms/{room['id']}/replay", headers=auth("user_carol")).status_code == 403
+
+
+def test_a_closed_room_records_nothing_more(client, room):
+    """A relay socket that outlived the room cannot rewrite its replay."""
+    pool = client.app.state.db_pool
+    with room_socket(client, room["id"], "user_alice"):
+        client.post(f"/api/rooms/{room['id']}/leave", headers=auth("user_alice"))
+    client.portal.call(RoomUpdateDAO(pool).record, room["id"], UPDATE)
+
+    assert client.portal.call(RoomUpdateDAO(pool).list_for_room, room["id"]) == []
 
 
 def test_past_sessions_list_the_rooms_you_were_in(client, room):

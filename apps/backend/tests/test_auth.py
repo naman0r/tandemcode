@@ -113,3 +113,13 @@ def test_websocket_refused_before_the_user_is_synced(client, room):
             f"/ws/room/{room['id']}?token={token('user_nobody')}"
         ):
             pass
+
+
+def test_unknown_signing_keys_cannot_force_repeated_jwks_fetches(client):
+    from tests.rig import JWKS_FETCHES
+
+    before = len(JWKS_FETCHES)
+    for attempt in range(5):
+        bogus = token(kid=f"unknown-{attempt}")
+        assert client.get("/api/rooms", headers={"Authorization": f"Bearer {bogus}"}).status_code == 401
+    assert len(JWKS_FETCHES) - before <= 1

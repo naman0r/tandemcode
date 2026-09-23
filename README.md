@@ -111,8 +111,9 @@ runner can call the same thing.
 With `SANDBOX_IMAGE` set, as it is in docker compose, the runner judges each
 submission in a fresh container from that image: no network, read-only root,
 a 64 MB `/tmp`, uid 65534, all capabilities dropped, a memory cap and 32
-processes. Without it, the runner judges in-process with rlimits only, which
-is fine for tests and not for strangers' code.
+processes. Without it the runner refuses to start, unless `ALLOW_UNSANDBOXED=1`
+is set, in which case it judges in-process with rlimits only: fine for tests,
+not for strangers' code. Output of hidden tests is never returned.
 
 The runner reaches Docker through the host's socket, so the runner itself is
 as trusted as the host. Keep it on a machine that runs nothing else, or move

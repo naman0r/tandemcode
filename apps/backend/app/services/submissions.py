@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncpg
 from fastapi import HTTPException, status
 
 from app.dao.problems import ProblemDAO
@@ -48,14 +49,6 @@ class SubmissionService:
                 detail=f"Problem not found: {problem_id}",
             )
 
-        # The runner is shared. One run at a time per person keeps a loop of
-        # submits from queueing everyone else's verdicts behind it.
-        if await self.submission_dao.has_in_flight(room_id, user_id):
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Wait for your current run to finish",
-            )
-
         user_exists = await self.user_dao.exists(user_id)
         if not user_exists:
             raise HTTPException(
@@ -63,7 +56,16 @@ class SubmissionService:
                 detail=f"User not found: {user_id}",
             )
 
-        return await self.submission_dao.create(room_id, user_id, problem_id, language, code)
+        # The runner is shared. One run at a time per person keeps a loop of
+        # submits from queueing everyone else's verdicts behind it; a unique
+        # index enforces it, so two requests at once cannot both get through.
+        try:
+            return await self.submission_dao.create(room_id, user_id, problem_id, language, code)
+        except asyncpg.UniqueViolationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Wait for your current run to finish",
+            ) from exc
 
     async def get_submission(self, submission_id) -> dict:
         submission = await self.submission_dao.get_by_id(submission_id)

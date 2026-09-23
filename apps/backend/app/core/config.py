@@ -52,13 +52,14 @@ RUN_MIGRATIONS_ON_STARTUP = os.getenv("RUN_MIGRATIONS_ON_STARTUP", "true").lower
 }
 
 # The Clerk instance that issues session tokens, e.g.
-# https://your-app-42.clerk.accounts.dev. Required: a backend that cannot check
-# tokens has no business starting.
-CLERK_ISSUER = _required("CLERK_ISSUER").rstrip("/")
+# https://your-app-42.clerk.accounts.dev. The API refuses to start without it
+# (see app.core.auth); the runner never checks a token and does not need it.
+CLERK_ISSUER = os.getenv("CLERK_ISSUER", "").rstrip("/")
 
 # Server-side Clerk credential, used to read user profiles. A real secret:
-# it must never reach the browser.
-CLERK_SECRET_KEY = _required("CLERK_SECRET_KEY")
+# it must never reach the browser, and the runner, which executes strangers'
+# code, has no use for it.
+CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY", "")
 
 # Clerk stamps the requesting origin into each token's `azp` claim. Our own
 # origins are the right default, since the browser app is the only client.

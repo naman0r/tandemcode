@@ -112,6 +112,15 @@ class RoomMemberDAO:
             rows = await conn.fetch(query, room_id)
         return [_map_user_in_room(row) for row in rows]
 
+    async def is_present(self, room_id: str, user_id: str) -> bool:
+        query = """
+            SELECT EXISTS(
+                SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2 AND left_at IS NULL
+            )
+        """
+        async with self.pool.acquire() as conn:
+            return bool(await conn.fetchval(query, room_id, user_id))
+
     async def was_member(self, room_id: str, user_id: str) -> bool:
         query = "SELECT EXISTS(SELECT 1 FROM room_members WHERE room_id = $1 AND user_id = $2)"
         async with self.pool.acquire() as conn:

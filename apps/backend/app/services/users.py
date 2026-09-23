@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
+
 import asyncpg
 from fastapi import HTTPException, status
 
 from app.core.clerk import ClerkProfileError, fetch_profile
 from app.dao.users import UserDAO
+
+logger = logging.getLogger(__name__)
 
 
 class UserService:
@@ -16,9 +20,10 @@ class UserService:
         try:
             email, name = await fetch_profile(user_id)
         except ClerkProfileError as exc:
+            logger.warning("%s", exc)
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=str(exc),
+                detail="Could not read your profile from Clerk",
             ) from exc
 
         # A repeat id is an upsert. Email carries its own UNIQUE constraint, and
@@ -31,12 +36,3 @@ class UserService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Email already registered: {email}",
             ) from exc
-
-    async def get_user(self, user_id: str) -> dict:
-        user = await self.user_dao.get_by_id(user_id)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"User not found with id: {user_id}",
-            )
-        return user

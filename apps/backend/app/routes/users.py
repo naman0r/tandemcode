@@ -15,12 +15,3 @@ async def sync_user(
     service: UserService = Depends(get_user_service),
 ) -> UserResponse:
     return UserResponse.model_validate(await service.sync_user(user_id))
-
-
-@router.get("/{user_id}", response_model=UserResponse)
-async def get_user(
-    user_id: str,
-    service: UserService = Depends(get_user_service),
-) -> UserResponse:
-    user = await service.get_user(user_id)
-    return UserResponse.model_validate(user)
