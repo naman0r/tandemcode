@@ -38,9 +38,7 @@ const CreateRoom = () => {
       };
 
       const newRoom = await roomApi.createRoom(roomData);
-      console.log("Room created:", newRoom);
 
-      // Navigate to the new room
       navigate(`/rooms/${newRoom.id}`);
     } catch (err) {
       setError("Failed to create room. Please try again.");
