@@ -58,8 +58,14 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:?missing DB_PASSWORD}
       CLERK_ISSUER: ${CLERK_ISSUER:?missing CLERK_ISSUER}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:?missing CLERK_SECRET_KEY}
-    # Submitted code runs as a subprocess of this container. The per-run
-    # rlimits in the judge cap one program; these cap the container itself.
+      SANDBOX_IMAGE: ${SANDBOX_IMAGE:-python:3.11-slim}
+    # Each submission runs in its own container with no network, started
+    # through the host's Docker socket. That makes this service as trusted as
+    # the host, which is why it runs nothing but our own code. It still runs
+    # as root: the socket is root-owned on most hosts.
+    user: "0:0"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     read_only: true
     tmpfs:
       - /tmp

@@ -76,6 +76,16 @@ class SubmissionDAO:
             rows = await conn.fetch(query, room_id, user_id)
         return [_map_submission(row) for row in rows]
 
+    async def has_in_flight(self, room_id: str, user_id: str) -> bool:
+        query = """
+            SELECT EXISTS(
+                SELECT 1 FROM submissions
+                WHERE room_id = $1 AND user_id = $2 AND status IN ('pending', 'running')
+            )
+        """
+        async with self.pool.acquire() as conn:
+            return bool(await conn.fetchval(query, room_id, user_id))
+
     async def claim_pending(self) -> dict | None:
         """Move the oldest pending submission to running and return it."""
         query = """

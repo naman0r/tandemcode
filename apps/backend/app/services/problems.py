@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncpg
 from fastapi import HTTPException, status
 
 from app.dao.problems import ProblemDAO
@@ -32,25 +31,3 @@ class ProblemService:
                 detail=f"Problem not found: {slug}",
             )
         return problem
-
-    async def create_problem(
-        self,
-        slug: str,
-        title: str,
-        difficulty: str,
-        time_limit_ms: int,
-        mem_limit_mb: int,
-    ) -> dict:
-        try:
-            return await self.problem_dao.create(
-                slug=slug,
-                title=title,
-                difficulty=difficulty,
-                time_limit_ms=time_limit_ms,
-                mem_limit_mb=mem_limit_mb,
-            )
-        except asyncpg.UniqueViolationError as exc:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=f"Problem with slug already exists: {slug}",
-            ) from exc

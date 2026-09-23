@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
-from collections import defaultdict
+import time
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 
 from fastapi import WebSocket, WebSocketException, status
@@ -12,6 +13,11 @@ from app.dao.room_members import RoomMemberDAO
 from app.websocket.auth import Participant
 
 logger = logging.getLogger(__name__)
+
+MAX_CHAT_CHARS = 2000
+# Ten messages in ten seconds is a fast typist; past that it is a script.
+CHAT_BURST = 10
+CHAT_WINDOW_SECONDS = 10.0
 
 
 class RoomChatManager:
@@ -26,6 +32,7 @@ class RoomChatManager:
     def __init__(self, events: EventDAO) -> None:
         self.room_sessions: dict[str, dict[WebSocket, Participant]] = defaultdict(dict)
         self.events = events
+        self.recent_sends: dict[WebSocket, deque[float]] = defaultdict(deque)
 
     async def join(
         self,
@@ -107,7 +114,9 @@ class RoomChatManager:
             return
 
         text = incoming.get("text")
-        if not isinstance(text, str) or not text.strip():
+        if not isinstance(text, str) or not text.strip() or len(text) > MAX_CHAT_CHARS:
+            return
+        if not self._within_rate(websocket):
             return
 
         message = {
@@ -141,7 +150,18 @@ class RoomChatManager:
 
         await self._broadcast_presence(room_id, room_member_dao)
 
+    def _within_rate(self, websocket: WebSocket) -> bool:
+        now = time.monotonic()
+        sends = self.recent_sends[websocket]
+        while sends and now - sends[0] > CHAT_WINDOW_SECONDS:
+            sends.popleft()
+        if len(sends) >= CHAT_BURST:
+            return False
+        sends.append(now)
+        return True
+
     def _forget(self, websocket: WebSocket, room_id: str) -> Participant | None:
+        self.recent_sends.pop(websocket, None)
         sessions = self.room_sessions.get(room_id)
         if sessions is None:
             return None

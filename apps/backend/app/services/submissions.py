@@ -48,6 +48,14 @@ class SubmissionService:
                 detail=f"Problem not found: {problem_id}",
             )
 
+        # The runner is shared. One run at a time per person keeps a loop of
+        # submits from queueing everyone else's verdicts behind it.
+        if await self.submission_dao.has_in_flight(room_id, user_id):
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Wait for your current run to finish",
+            )
+
         user_exists = await self.user_dao.exists(user_id)
         if not user_exists:
             raise HTTPException(

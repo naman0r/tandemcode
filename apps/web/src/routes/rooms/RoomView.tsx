@@ -218,6 +218,7 @@ const Room = ({ roomId }: { roomId: string }) => {
   const [code, setCode] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [runError, setRunError] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
 
   const { isConnected, connectionState, messages, members, submissions, seedSubmissions, sendMessage } =
@@ -270,10 +271,12 @@ const Room = ({ roomId }: { roomId: string }) => {
     if (!problem) return;
     setSubmitting(true);
     setSelectedId(null);
+    setRunError(null);
     try {
       await submissionApi.submit({ roomId, problemId: problem.id, language: "python", code });
     } catch (err) {
-      console.error("Submission failed:", err);
+      const detail = (err as { response?: { data?: { detail?: unknown } } }).response?.data?.detail;
+      setRunError(typeof detail === "string" ? detail : "The run could not be submitted.");
     } finally {
       setSubmitting(false);
     }
@@ -342,6 +345,11 @@ const Room = ({ roomId }: { roomId: string }) => {
                 starterCode={problem?.starterCode}
                 onCodeChange={setCode}
               />
+            )}
+            {runError && (
+              <p className="border-t border-zinc-200 px-4 py-2 text-sm text-red-700 dark:border-zinc-800 dark:text-red-300">
+                {runError}
+              </p>
             )}
             {shown && <VerdictPanel submission={shown} />}
           </section>

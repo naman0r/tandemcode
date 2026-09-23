@@ -3,14 +3,18 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+# Generous for a solution, far too small to be a storage or judge problem.
+MAX_CODE_BYTES = 64 * 1024
 
 
 class SubmitRequest(BaseModel):
-    roomId: str
+    roomId: str = Field(max_length=64)
     problemId: UUID
-    language: str
-    code: str
+    language: str = Field(max_length=32)
+    code: str = Field(max_length=MAX_CODE_BYTES)
 
 
 class TestOutcome(BaseModel):

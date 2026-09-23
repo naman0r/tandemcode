@@ -34,11 +34,6 @@ export const userApi = {
     const response = await api.get(`/users/${id}`);
     return response.data;
   },
-
-  getAllUsers: async () => {
-    const response = await api.get("/users");
-    return response.data;
-  },
 };
 
 export const roomApi = {
