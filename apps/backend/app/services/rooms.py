@@ -15,7 +15,7 @@ from app.dao.users import UserDAO
 
 # Enough for anyone opening rooms by hand; a script hits it in seconds.
 ROOMS_PER_HOUR = 10
-# The newest open rooms. Past this the list is not browsable anyway.
+# Past this the list is not browsable anyway.
 ROOM_LIST_LIMIT = 100
 
 
@@ -23,8 +23,9 @@ async def get_active_room(room_dao: RoomDAO, room_id: str) -> dict:
     """The room, if it exists and is still open.
 
     Every room-scoped read, write and websocket goes through here. There is no
-    per-user rule to apply: any signed-in user may enter any open room, which is
-    what the product does - the room list is public and rooms are entered by id.
+    per-user rule to apply: any signed-in user may enter any open room they have
+    the id of. Public rooms are listed; an unlisted room's id is only in its
+    invite link, and ids are random UUIDs.
     Authentication happens at the HTTP and websocket boundaries; this is only
     about the room. Narrowing to invitations needs a real membership table, which
     is the open question on issue #15.
@@ -77,7 +78,9 @@ class RoomService:
         self.event_dao = event_dao
         self.submission_dao = submission_dao
 
-    async def create_room(self, name: str, description: str | None, created_by: str) -> dict:
+    async def create_room(
+        self, name: str, description: str | None, created_by: str, visibility: str, advertised: bool
+    ) -> dict:
         # The caller is authenticated but may not have been synced into our users
         # table yet, and the room's foreign key needs that row. Checked up front
         # so it is a 404 rather than a foreign key violation as a 500.
@@ -94,16 +97,17 @@ class RoomService:
             )
 
         room_id = str(uuid4())
-        return await self.room_dao.create(room_id, name, description, created_by)
+        return await self.room_dao.create(room_id, name, description, created_by, visibility, advertised)
 
     async def get_room(self, room_id: str) -> dict:
         return await get_active_room(self.room_dao, room_id)
 
     async def list_active_rooms(self) -> list[dict]:
-        return await self.room_dao.list_active(ROOM_LIST_LIMIT)
+        return await self.room_dao.list_listed(ROOM_LIST_LIMIT)
 
-    async def list_rooms_by_creator(self, user_id: str) -> list[dict]:
-        return await self.room_dao.list_active_by_creator(user_id)
+    async def set_listing(self, room_id: str, visibility: str, advertised: bool, caller_id: str) -> dict:
+        await ensure_room_owner(self.room_dao, room_id, caller_id)
+        return await self.room_dao.set_listing(room_id, visibility, advertised)
 
     async def list_my_rooms(self, user_id: str, active: bool) -> list[dict]:
         return await self.room_dao.list_for_participant(user_id, active)

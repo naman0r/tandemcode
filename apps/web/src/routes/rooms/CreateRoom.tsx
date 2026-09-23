@@ -2,11 +2,44 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Layout from "../../components/Layout";
+import InviteButton from "../../components/InviteButton";
 import RequireSignIn from "../../components/RequireSignIn";
 import { problemApi, roomApi } from "../../lib/api";
+import type { RoomVisibility } from "../../lib/api";
+import { inviteLink } from "../../lib/format";
 import { badge, button, card, difficulty, input, muted } from "../../lib/ui";
 
 type Problem = { id: string; title: string; difficulty: string };
+
+const VISIBILITY_OPTIONS: { value: RoomVisibility; label: string; hint: string }[] = [
+  { value: "public", label: "Public", hint: "Listed on the rooms page. You can still send the link." },
+  { value: "unlisted", label: "Unlisted", hint: "Not listed. Only people with the link can join." },
+];
+
+// An unlisted room is only reachable through its link, so the link is the
+// next thing to show, before the room itself.
+const InviteStep = ({ roomId }: { roomId: string }) => {
+  const link = inviteLink(roomId);
+  return (
+    <div className={`${card} mx-auto max-w-md space-y-5 p-6`}>
+      <div>
+        <h1 className="text-xl font-semibold">Your room is ready</h1>
+        <p className={`${muted} mt-1 text-sm`}>
+          It is unlisted, so this link is the only way in. Send it to your partner.
+        </p>
+      </div>
+      <div className="flex gap-2">
+        <input className={input} value={link} readOnly onFocus={(event) => event.target.select()} />
+        <InviteButton roomId={roomId} label="Copy" />
+      </div>
+      <div className="flex justify-end">
+        <Link to={`/rooms/${roomId}`} className={button.primary}>
+          Enter the room
+        </Link>
+      </div>
+    </div>
+  );
+};
 
 const CreateRoomForm = () => {
   const navigate = useNavigate();
@@ -15,6 +48,9 @@ const CreateRoomForm = () => {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [visibility, setVisibility] = useState<RoomVisibility>("public");
+  const [advertised, setAdvertised] = useState(false);
+  const [unlistedRoomId, setUnlistedRoomId] = useState<string | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,9 +72,20 @@ const CreateRoomForm = () => {
     setCreating(true);
     setError(null);
     try {
-      const room = await roomApi.createRoom({ name: name.trim(), description: description.trim() });
-      if (problem) await roomApi.setRoomProblem(room.id, problem.id);
-      navigate(`/rooms/${room.id}`);
+      const room = await roomApi.createRoom({
+        name: name.trim(),
+        description: description.trim(),
+        visibility,
+        advertised: visibility === "public" && advertised,
+      });
+      // The room exists either way; a problem can still be picked inside it.
+      if (problem) {
+        await roomApi
+          .setRoomProblem(room.id, problem.id)
+          .catch((err) => console.error("Failed to set the problem:", err));
+      }
+      if (visibility === "unlisted") setUnlistedRoomId(room.id);
+      else navigate(`/rooms/${room.id}`);
     } catch (err) {
       console.error("Failed to create room:", err);
       setError("Could not create the room. Try again.");
@@ -46,11 +93,13 @@ const CreateRoomForm = () => {
     }
   };
 
+  if (unlistedRoomId) return <InviteStep roomId={unlistedRoomId} />;
+
   return (
     <form onSubmit={submit} className={`${card} mx-auto max-w-md space-y-5 p-6`}>
       <div>
         <h1 className="text-xl font-semibold">Create a room</h1>
-        <p className={`${muted} mt-1 text-sm`}>You get an invite link once it is open.</p>
+        <p className={`${muted} mt-1 text-sm`}>Every room has an invite link, public or not.</p>
       </div>
 
       {problem && (
@@ -86,6 +135,50 @@ const CreateRoomForm = () => {
           placeholder="What you want to work on"
         />
       </label>
+
+      <fieldset className="space-y-2 text-sm">
+        <legend className="mb-1 font-medium">Who can find it</legend>
+        {VISIBILITY_OPTIONS.map((option) => (
+          <label
+            key={option.value}
+            className={`flex cursor-pointer gap-3 rounded-lg border px-3 py-2 ${
+              visibility === option.value
+                ? "border-orange-500 bg-orange-50 dark:bg-orange-950"
+                : "border-zinc-300 dark:border-zinc-700"
+            }`}
+          >
+            <input
+              type="radio"
+              name="visibility"
+              value={option.value}
+              checked={visibility === option.value}
+              onChange={() => setVisibility(option.value)}
+              className="mt-1 accent-orange-500"
+            />
+            <span>
+              <span className="block font-medium">{option.label}</span>
+              <span className={muted}>{option.hint}</span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+
+      {visibility === "public" && (
+        <label className="flex cursor-pointer items-start gap-3 text-sm">
+          <input
+            type="checkbox"
+            checked={advertised}
+            onChange={(event) => setAdvertised(event.target.checked)}
+            className="mt-1 accent-orange-500"
+          />
+          <span>
+            <span className="block font-medium">Ask for a partner</span>
+            <span className={muted}>
+              Highlight the room on the rooms page until someone joins you.
+            </span>
+          </span>
+        </label>
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 

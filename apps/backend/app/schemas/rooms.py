@@ -1,16 +1,34 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.submissions import SubmissionResponse
 
 
-class CreateRoomRequest(BaseModel):
+Visibility = Literal["public", "unlisted"]
+
+
+class RoomListing(BaseModel):
+    # No defaults: a PUT that left one out must not quietly list a room.
+    visibility: Visibility
+    advertised: bool
+
+    @model_validator(mode="after")
+    def _advertise_only_in_public(self):
+        if self.advertised and self.visibility != "public":
+            raise ValueError("Only a public room can be advertised")
+        return self
+
+
+class CreateRoomRequest(RoomListing):
     name: str = Field(min_length=1, max_length=80)
     description: str | None = Field(default=None, max_length=500)
+    visibility: Visibility = "public"
+    advertised: bool = False
 
 
 class SetProblemRequest(BaseModel):
@@ -30,6 +48,9 @@ class RoomResponse(BaseModel):
     isActive: bool
     createdAt: datetime
     currentProblemId: UUID | None = None
+    visibility: Visibility
+    advertised: bool
+    memberCount: int
 
 
 class UserInRoomResponse(BaseModel):

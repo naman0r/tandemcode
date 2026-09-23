@@ -1,17 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Check, Link2 } from "lucide-react";
 import Layout from "../../components/Layout";
 import RequireSignIn from "../../components/RequireSignIn";
 import RoomChatComponent from "../../components/RoomChatComponent";
 import RoomMembersPanel from "../../components/RoomMembersPanel";
 import CollaborativeEditor from "../../components/CollaborativeEditor";
+import InviteButton from "../../components/InviteButton";
 import { useUser } from "../../hooks/useUser";
 import useWebSocket from "../../hooks/UseWebSocket";
 import type { Submission } from "../../hooks/UseWebSocket";
 import { problemApi, roomApi, submissionApi } from "../../lib/api";
+import type { RoomVisibility } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
-import { badge, button, card, difficulty, muted } from "../../lib/ui";
+import { badge, button, card, difficulty, input, muted } from "../../lib/ui";
 
 type Problem = {
   id: string;
@@ -32,6 +33,8 @@ type Room = {
   createdBy: string;
   createdByName: string | null;
   currentProblemId: string | null;
+  visibility: RoomVisibility;
+  advertised: boolean;
 };
 
 const PENDING_STATUSES = new Set(["pending", "running"]);
@@ -121,18 +124,52 @@ const RunHistory = ({
   </section>
 );
 
-const InviteButton = ({ roomId }: { roomId: string }) => {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    await navigator.clipboard.writeText(`${window.location.origin}/rooms/${roomId}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+// Asking for a partner only means something while you are alone, so the
+// button is not offered once someone has joined.
+const ListingControls = ({
+  room,
+  alone,
+  onChange,
+}: {
+  room: Room;
+  alone: boolean;
+  onChange: (room: Room) => void;
+}) => {
+  const [saving, setSaving] = useState(false);
+  const save = async (visibility: RoomVisibility, advertised: boolean) => {
+    setSaving(true);
+    try {
+      onChange(await roomApi.setListing(room.id, { visibility, advertised: visibility === "public" && advertised }));
+    } catch (err) {
+      console.error("Failed to update the room listing:", err);
+    } finally {
+      setSaving(false);
+    }
   };
   return (
-    <button type="button" onClick={copy} className={button.secondary}>
-      {copied ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
-      {copied ? "Copied" : "Copy invite link"}
-    </button>
+    <>
+      <select
+        aria-label="Who can find this room"
+        value={room.visibility}
+        disabled={saving}
+        onChange={(event) => save(event.target.value as RoomVisibility, room.advertised)}
+        className={`${input} w-auto`}
+      >
+        <option value="public">Public</option>
+        <option value="unlisted">Unlisted</option>
+      </select>
+      {room.visibility === "public" && alone && (
+        <button
+          type="button"
+          aria-pressed={room.advertised}
+          disabled={saving}
+          onClick={() => save("public", !room.advertised)}
+          className={room.advertised ? button.primary : button.secondary}
+        >
+          {room.advertised ? "Asking for a partner" : "Ask for a partner"}
+        </button>
+      )}
+    </>
   );
 };
 
@@ -307,7 +344,10 @@ const Room = ({ roomId }: { roomId: string }) => {
     <>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">{room.name}</h1>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            {room.name}
+            {room.visibility === "unlisted" && <span className={badge(undefined)}>Unlisted</span>}
+          </h1>
           <p className={`${muted} mt-1 text-sm`}>
             {room.description ? `${room.description} · ` : ""}
             opened by {room.createdByName ?? "someone"}
@@ -318,6 +358,7 @@ const Room = ({ roomId }: { roomId: string }) => {
             <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-500" : "bg-amber-500"}`} />
             {isConnected ? "Live" : "Connecting"}
           </span>
+          {isOwner && <ListingControls room={room} alone={members.length < 2} onChange={setRoom} />}
           <InviteButton roomId={roomId} />
           <LeaveRoomButton roomId={roomId} />
         </div>
