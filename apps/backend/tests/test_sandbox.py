@@ -47,7 +47,8 @@ def test_program_cannot_write_outside_tmp():
     code = "open('/etc/owned', 'w').write('x')\nprint(5)\n"
     verdict = judge_in_container(IMAGE, code, TESTS, 2000, 128)
     assert verdict.status == RUNTIME_ERROR
-    assert "OSError" in verdict.tests[0].stderr or "Read-only" in verdict.tests[0].stderr
+    # runc reports the read-only root; gVisor refuses the uid before it gets there.
+    assert any(error in verdict.tests[0].stderr for error in ("Read-only", "OSError", "PermissionError"))
 
 
 def test_program_cannot_write_to_the_judges_stdout():

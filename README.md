@@ -115,9 +115,13 @@ processes. Without it the runner refuses to start, unless `ALLOW_UNSANDBOXED=1`
 is set, in which case it judges in-process with rlimits only: fine for tests,
 not for strangers' code. Output of hidden tests is never returned.
 
+Containers share the host kernel, so one kernel bug is enough to escape them.
+With `SANDBOX_RUNTIME=runsc` each judge container runs under gVisor, which
+handles the program's system calls in its own user-space kernel; production
+sets it, and `infra/install-gvisor.sh` installs it on an Ubuntu host.
+
 The runner reaches Docker through the host's socket, so the runner itself is
-as trusted as the host. Keep it on a machine that runs nothing else, or move
-judging to Fargate or gVisor before opening sign-ups.
+as trusted as the host. Keep it on a machine that runs nothing else.
 
 ## Contributing
 

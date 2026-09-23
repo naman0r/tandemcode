@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
 import uuid
 from pathlib import Path
@@ -26,6 +27,11 @@ JUDGE_SOURCE = (Path(__file__).parent / "judge.py").read_text()
 CONTAINER_MEMORY_OVERHEAD_MB = 64
 # Container start and interpreter start, on top of the tests' own limits.
 STARTUP_ALLOWANCE_SECONDS = 20
+
+# `runsc` in production: gVisor answers the program's system calls itself, so
+# escaping the container takes a gVisor bug and then a kernel bug, not one
+# kernel bug. Unset, Docker's default runtime is used, as on a laptop.
+SANDBOX_RUNTIME = os.getenv("SANDBOX_RUNTIME")
 
 
 def pull(image: str) -> None:
@@ -48,6 +54,7 @@ def judge_in_container(
         "--cap-drop", "ALL",
         "--security-opt", "no-new-privileges",
         "--env", "PYTHONDONTWRITEBYTECODE=1",
+        *(["--runtime", SANDBOX_RUNTIME] if SANDBOX_RUNTIME else []),
         image,
         "python", "-I", "-c", JUDGE_SOURCE,
     ]
