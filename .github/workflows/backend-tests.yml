@@ -1,0 +1,44 @@
+name: Backend tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: tandemcode
+          POSTGRES_PASSWORD: tandemcode
+          POSTGRES_DB: tandemcode_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tandemcode"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DB_HOST: localhost
+      DB_PORT: "5432"
+      DB_PASSWORD: tandemcode
+      CLERK_ISSUER: http://127.0.0.1:1
+      CLERK_SECRET_KEY: sk_test_ci
+    defaults:
+      run:
+        working-directory: apps/backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m pytest -v
