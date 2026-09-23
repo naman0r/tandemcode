@@ -1,135 +1,79 @@
-import React, { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { FormEvent } from "react";
+import { SendHorizontal } from "lucide-react";
 import type { ChatMessage } from "../hooks/UseWebSocket";
+import { button, card, input, muted } from "../lib/ui";
 
-interface RoomChatComponentProps {
-  roomId?: string;
+interface Props {
   isConnected: boolean;
   messages: ChatMessage[];
   sendMessage: (text: string) => void;
 }
 
-const RoomChatComponent: React.FC<RoomChatComponentProps> = ({
-  roomId,
-  isConnected,
-  messages,
-  sendMessage,
-}) => {
-  const [newMessage, setNewMessage] = useState("");
+const RoomChatComponent = ({ isConnected, messages, sendMessage }: Props) => {
+  const [draft, setDraft] = useState("");
+  const endRef = useRef<HTMLDivElement>(null);
 
-  const handleSendMessage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !isConnected) return;
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ block: "end" });
+  }, [messages]);
 
-    // Send message through WebSocket
-    sendMessage(newMessage.trim());
-    setNewMessage("");
-  };
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const text = draft.trim();
+    if (!text || !isConnected) return;
+    sendMessage(text);
+    setDraft("");
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-200 h-full flex flex-col">
-      {/* Chat Header */}
-      <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Room chat</h3>
-            <p className="text-sm text-gray-600">
-              {roomId ? `Room: ${roomId}` : "Room chat"}
-            </p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <div
-              className={`w-2 h-2 rounded-full ${
-                isConnected ? "bg-green-500" : "bg-red-500"
-              }`}
-            ></div>
-            <span className="text-xs text-gray-600">
-              {isConnected ? "Connected" : "Disconnected"}
-            </span>
-          </div>
-        </div>
-      </div>
+    <section className={`${card} flex h-96 flex-col`}>
+      <h2 className="border-b border-zinc-200 px-4 py-3 font-semibold dark:border-zinc-800">Chat</h2>
 
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 max-h-96">
+      <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+        {messages.length === 0 && (
+          <p className={`${muted} text-sm`}>No messages yet.</p>
+        )}
         {messages.map((message) => (
-          <div
-            key={message.id}
-            className={`flex ${
-              message.isOwn ? "justify-end" : "justify-start"
-            }`}
-          >
-            <div
-              className={`max-w-xs lg:max-w-md ${
-                message.isOwn ? "order-1" : "order-2"
-              }`}
-            >
-              {/* Username & Time */}
-              <div
-                className={`text-xs text-gray-500 mb-1 ${
-                  message.isOwn ? "text-right" : "text-left"
-                }`}
-              >
-                {message.username} • {formatTime(message.timestamp)}
-              </div>
-
-              {/* Message Bubble */}
-              <div
-                className={`px-4 py-2 rounded-2xl ${
+          <div key={message.id} className={`flex ${message.isOwn ? "justify-end" : "justify-start"}`}>
+            <div className="max-w-[85%]">
+              <p className={`${muted} mb-0.5 text-xs ${message.isOwn ? "text-right" : ""}`}>
+                {message.username} ·{" "}
+                {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              </p>
+              <p
+                className={`rounded-2xl px-3 py-1.5 text-sm ${
                   message.isOwn
                     ? "bg-indigo-600 text-white"
-                    : "bg-gray-100 text-gray-900"
+                    : "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
                 }`}
               >
-                <p className="text-sm">{message.text}</p>
-              </div>
+                {message.text}
+              </p>
             </div>
           </div>
         ))}
+        <div ref={endRef} />
       </div>
 
-      {/* Message Input */}
-      <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 text-black rounded-b-xl">
-        <form onSubmit={handleSendMessage} className="flex space-x-3">
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm"
-            disabled={!isConnected}
-          />
-          <button
-            type="submit"
-            disabled={!newMessage.trim() || !isConnected}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
-              />
-            </svg>
-          </button>
-        </form>
-
-        {!isConnected && (
-          <p className="text-xs text-gray-500 mt-2">
-            Connect to start chatting...
-          </p>
-        )}
-      </div>
-    </div>
+      <form onSubmit={submit} className="flex gap-2 border-t border-zinc-200 p-3 dark:border-zinc-800">
+        <input
+          className={input}
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder={isConnected ? "Message" : "Connecting..."}
+          disabled={!isConnected}
+        />
+        <button
+          type="submit"
+          disabled={!draft.trim() || !isConnected}
+          aria-label="Send"
+          className={`${button.primary} px-3`}
+        >
+          <SendHorizontal className="h-4 w-4" />
+        </button>
+      </form>
+    </section>
   );
 };
 

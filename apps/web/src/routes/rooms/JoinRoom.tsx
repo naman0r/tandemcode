@@ -1,134 +1,57 @@
-import React, { useState } from "react";
+import { useState } from "react";
+import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import Header from "../../components/Header";
-import Footer from "../../components/Footer";
+import Layout from "../../components/Layout";
+import RequireSignIn from "../../components/RequireSignIn";
+import { button, card, input, muted } from "../../lib/ui";
+
+// Accepts the invite link as copied from a room, or a bare id.
+const roomIdFrom = (value: string): string => {
+  const trimmed = value.trim();
+  const match = trimmed.match(/\/rooms\/([^/?#]+)/);
+  return match ? match[1] : trimmed;
+};
 
 const JoinRoom = () => {
-  const [roomId, setRoomId] = useState("");
   const navigate = useNavigate();
+  const [value, setValue] = useState("");
 
-  const handleJoinRoom = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const id = roomId.trim();
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const id = roomIdFrom(value);
     if (id) navigate(`/rooms/${id}`);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <Header />
-
-      {/* Main Content */}
-      <div
-        className="flex items-center justify-center px-4 sm:px-6 lg:px-8"
-        style={{ minHeight: "calc(100vh - 4rem)" }}
-      >
-        <div className="max-w-md w-full">
-          {/* Back Link */}
-          <div className="mb-8">
-            <Link
-              to="/rooms"
-              className="inline-flex items-center text-indigo-600 hover:text-indigo-700 font-medium"
-            >
-              <svg
-                className="w-4 h-4 mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-              Back to rooms
+    <Layout>
+      <RequireSignIn>
+        <form onSubmit={submit} className={`${card} mx-auto max-w-md space-y-5 p-6`}>
+          <div>
+            <h1 className="text-xl font-semibold">Join a room</h1>
+            <p className={`${muted} mt-1 text-sm`}>Paste the invite link your partner sent you.</p>
+          </div>
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium">Invite link</span>
+            <input
+              className={input}
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              placeholder={`${window.location.origin}/rooms/...`}
+              required
+              autoFocus
+            />
+          </label>
+          <div className="flex items-center justify-between">
+            <Link to="/rooms" className={`${muted} text-sm hover:underline`}>
+              Browse open rooms
             </Link>
+            <button type="submit" disabled={!value.trim()} className={button.primary}>
+              Join
+            </button>
           </div>
-
-          {/* Join Form Card */}
-          <div className="bg-white rounded-2xl shadow-xl p-8">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-indigo-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-                <svg
-                  className="w-8 h-8 text-indigo-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                  />
-                </svg>
-              </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Join a room
-              </h1>
-              <p className="text-gray-600">
-                Enter a room id to join an existing coding session
-              </p>
-            </div>
-
-            <form onSubmit={handleJoinRoom} className="space-y-6">
-              <div>
-                <label
-                  htmlFor="roomId"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  Room id
-                </label>
-                <input
-                  type="text"
-                  id="roomId"
-                  value={roomId}
-                  onChange={(e) => setRoomId(e.target.value)}
-                  placeholder="e.g. room-abc123"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors"
-                  required
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                  Ask your partner for the room id to join their session
-                </p>
-              </div>
-
-              <button
-                type="submit"
-                disabled={!roomId.trim()}
-                className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Join room
-              </button>
-            </form>
-
-            {/* Alternative Actions */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <div className="text-center">
-                <p className="text-sm text-gray-600 mb-4">
-                  Don't have a room id?
-                </p>
-                <Link
-                  to="/rooms"
-                  className="text-indigo-600 hover:text-indigo-700 font-medium text-sm"
-                >
-                  Browse available rooms
-                </Link>
-                <span className="text-gray-400 mx-2">or</span>
-                <Link
-                  to="/rooms/create"
-                  className="text-indigo-600 hover:text-indigo-700 font-medium text-sm"
-                >
-                  Create a new room
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <Footer />
-    </div>
+        </form>
+      </RequireSignIn>
+    </Layout>
   );
 };
 

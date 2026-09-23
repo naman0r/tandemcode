@@ -1,5 +1,6 @@
 import { useUser as useClerkUser } from "@clerk/clerk-react";
 import type { ConnectionState, RoomMember } from "../hooks/UseWebSocket";
+import { card, muted } from "../lib/ui";
 
 const RoomMembersPanel = ({
   members,
@@ -13,64 +14,39 @@ const RoomMembersPanel = ({
   // Membership is presence: the server pushes the roster whenever anyone joins
   // or leaves, so everyone listed is connected right now.
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
-      <h3 className="text-lg font-semibold text-gray-800 mb-3">
-        Room members ({members.length})
-      </h3>
+    <section className={`${card} p-4`}>
+      <h2 className="mb-3 font-semibold">In the room ({members.length})</h2>
 
       {members.length === 0 ? (
-        <div className="text-gray-500">
-          {connectionState === "connected" ? "No members in this room" : "Connecting..."}
-        </div>
+        <p className={`${muted} text-sm`}>
+          {connectionState === "connected" ? "Nobody here yet." : "Connecting..."}
+        </p>
       ) : (
-        <div className="space-y-3">
+        <ul className="space-y-2">
           {members.map((member) => {
             const isCurrentUser = member.userId === clerkUser?.id;
-            const profileImage = isCurrentUser ? clerkUser?.imageUrl : null;
-
+            const image = isCurrentUser ? clerkUser?.imageUrl : null;
+            const name = member.name || "Unknown user";
             return (
-              <div key={member.userId} className="flex items-center space-x-3">
-                {profileImage ? (
-                  <img
-                    src={profileImage}
-                    alt={member.name ?? "Member"}
-                    className="w-8 h-8 rounded-full object-cover"
-                  />
+              <li key={member.userId} className="flex items-center gap-3 text-sm">
+                {image ? (
+                  <img src={image} alt="" className="h-8 w-8 rounded-full object-cover" />
                 ) : (
-                  <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-sm font-medium">
-                      {member.name?.charAt(0)?.toUpperCase() || "U"}
-                    </span>
-                  </div>
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-sm font-medium text-white">
+                    {name.charAt(0).toUpperCase()}
+                  </span>
                 )}
-
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">
-                    {isCurrentUser
-                      ? `${member.name} (You)`
-                      : member.name || "Unknown user"}
-                  </div>
-                  <div
-                    className={`text-xs capitalize ${
-                      member.role === "owner"
-                        ? "text-indigo-600 font-medium"
-                        : "text-gray-500"
-                    }`}
-                  >
-                    {member.role}
-                  </div>
-                </div>
-
-                <div
-                  className="w-2 h-2 bg-green-500 rounded-full"
-                  title="Online"
-                ></div>
-              </div>
+                <span className="flex-1">
+                  {name}
+                  {isCurrentUser && <span className={`${muted} ml-1`}>(you)</span>}
+                </span>
+                {member.role === "owner" && <span className={`${muted} text-xs`}>owner</span>}
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
-    </div>
+    </section>
   );
 };
 

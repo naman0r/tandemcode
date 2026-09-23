@@ -1,169 +1,97 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Plus, Users } from "lucide-react";
+import Layout from "../components/Layout";
+import RequireSignIn from "../components/RequireSignIn";
 import { useUser } from "../hooks/useUser";
-import { SignOutButton, useUser as useClerkUser } from "@clerk/clerk-react";
-import { API_BASE_URL } from "../lib/config";
+import { roomApi } from "../lib/api";
+import { timeAgo } from "../lib/format";
+import { button, card, muted } from "../lib/ui";
 
-export default function Dashboard() {
-  const { user: clerkUser, isLoaded, isSignedIn } = useClerkUser();
-  const backendUser = useUser();
+type Room = {
+  id: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+};
 
-  if (!isLoaded) {
+const YourRooms = ({ userId }: { userId: string }) => {
+  const [rooms, setRooms] = useState<Room[] | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    roomApi
+      .getRoomsByCreator(userId)
+      .then(setRooms)
+      .catch(() => setError(true));
+  }, [userId]);
+
+  if (error) return <p className="text-sm text-red-600">Could not load your rooms.</p>;
+  if (rooms === null) return <p className={`${muted} text-sm`}>Loading...</p>;
+  if (rooms.length === 0) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
-      </div>
-    );
-  }
-
-  if (!isSignedIn) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Please sign in to access the dashboard.</div>
-      </div>
+      <p className={`${muted} text-sm`}>
+        You have no open rooms. Create one to start a session.
+      </p>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl font-semibold text-gray-900">
-                TandemCode Dashboard
-              </h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-700">
-                Welcome, {clerkUser?.firstName}!
-              </span>
-              <SignOutButton>
-                <button className="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700">
-                  Sign Out
-                </button>
-              </SignOutButton>
-            </div>
+    <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
+      {rooms.map((room) => (
+        <li key={room.id} className="flex items-center justify-between py-3">
+          <div>
+            <Link to={`/rooms/${room.id}`} className="font-medium hover:underline">
+              {room.name}
+            </Link>
+            <p className={`${muted} text-xs`}>
+              {room.description || "No description"} · opened {timeAgo(room.createdAt)}
+            </p>
           </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="border-4 border-dashed border-gray-200 rounded-lg p-8">
-            {/* User Sync Status */}
-            <div className="mb-8">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">
-                User Sync Status
-              </h2>
-
-              {backendUser && (
-                <div className="bg-green-50 border border-green-200 rounded-md p-4">
-                  <div className="flex">
-                    <div className="ml-3">
-                      <p className="text-sm text-green-800">
-                        Account synced successfully!
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* User Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Clerk User Info */}
-              <div className="bg-white p-6 rounded-lg shadow">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Clerk Authentication
-                </h3>
-                <dl className="space-y-2">
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">
-                      User ID
-                    </dt>
-                    <dd className="text-sm text-gray-900 font-mono">
-                      {clerkUser?.id}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Email</dt>
-                    <dd className="text-sm text-gray-900">
-                      {clerkUser?.primaryEmailAddress?.emailAddress}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-sm font-medium text-gray-500">Name</dt>
-                    <dd className="text-sm text-gray-900">
-                      {clerkUser?.fullName}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-
-              {/* Backend User Info */}
-              <div className="bg-white p-6 rounded-lg shadow">
-                <h3 className="text-lg font-medium text-gray-900 mb-4">
-                  Backend Database
-                </h3>
-                {backendUser ? (
-                  <dl className="space-y-2">
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">
-                        Database ID
-                      </dt>
-                      <dd className="text-sm text-gray-900 font-mono">
-                        {backendUser.id}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">
-                        Email
-                      </dt>
-                      <dd className="text-sm text-gray-900">
-                        {backendUser.email}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">
-                        Name
-                      </dt>
-                      <dd className="text-sm text-gray-900">
-                        {backendUser.name}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt className="text-sm font-medium text-gray-500">
-                        Created
-                      </dt>
-                      <dd className="text-sm text-gray-900">
-                        {new Date(backendUser.createdAt).toLocaleString()}
-                      </dd>
-                    </div>
-                  </dl>
-                ) : (
-                  <p className="text-sm text-gray-500">
-                    No backend user data available
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Debug Information */}
-            <div className="mt-8 bg-gray-100 p-4 rounded-lg">
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Debug Info
-              </h3>
-              <div className="text-xs text-gray-600 space-y-1">
-                <div>Clerk Loaded: {isLoaded ? "Yes" : "No"}</div>
-                <div>Signed In: {isSignedIn ? "Yes" : "No"}</div>
-                <div>Backend User Exists: {backendUser ? "Yes" : "No"}</div>
-                <div>API Base: {API_BASE_URL}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
+          <Link to={`/rooms/${room.id}`} className={button.secondary}>
+            Open
+          </Link>
+        </li>
+      ))}
+    </ul>
   );
-}
+};
+
+const Dashboard = () => {
+  const user = useUser();
+
+  return (
+    <Layout>
+      <RequireSignIn>
+        <h1 className="text-2xl font-semibold">
+          {user?.name ? `Hi, ${user.name.split(" ")[0]}` : "Dashboard"}
+        </h1>
+        <p className={`${muted} mt-1 text-sm`}>Pick up a room or start a new one.</p>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <Link to="/rooms/create" className={`${card} flex items-center gap-4 p-5 hover:border-indigo-400`}>
+            <Plus className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+            <div>
+              <p className="font-medium">Create a room</p>
+              <p className={`${muted} text-sm`}>Then send your partner the invite link.</p>
+            </div>
+          </Link>
+          <Link to="/rooms" className={`${card} flex items-center gap-4 p-5 hover:border-indigo-400`}>
+            <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+            <div>
+              <p className="font-medium">Browse open rooms</p>
+              <p className={`${muted} text-sm`}>Join a session that is already running.</p>
+            </div>
+          </Link>
+        </div>
+
+        <section className={`${card} mt-6 p-5`}>
+          <h2 className="mb-2 font-semibold">Your open rooms</h2>
+          {user && <YourRooms userId={user.id} />}
+        </section>
+      </RequireSignIn>
+    </Layout>
+  );
+};
+
+export default Dashboard;

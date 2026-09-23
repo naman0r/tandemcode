@@ -24,6 +24,7 @@ class RoomResponse(BaseModel):
     name: str
     description: str | None
     createdBy: str
+    createdByName: str | None
     isActive: bool
     createdAt: datetime
     currentProblemId: UUID | None = None

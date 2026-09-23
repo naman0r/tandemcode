@@ -6,44 +6,32 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
 import { WS_BASE_URL } from "../lib/config";
+import { useTheme } from "../lib/theme";
 
 interface Props {
   roomId: string;
-  language: string;
   starterCode?: string | null;
   onCodeChange: (code: string) => void;
 }
 
-const MONACO_LANGUAGE: Record<string, string> = {
-  python: "python",
-  javascript: "javascript",
-  java: "java",
-};
-
 const WS_URL = `${WS_BASE_URL}/ws/yjs`;
 
 type MonacoEditor = Parameters<OnMount>[0];
-type Monaco = Parameters<OnMount>[1];
 
 // Clerk session tokens last about a minute. y-websocket re-reads provider.params
 // every time it dials, so refreshing well inside that window is what lets a
 // dropped connection come back instead of failing the handshake forever.
 const TOKEN_REFRESH_MS = 30_000;
 
-const CollaborativeEditor = ({
-  roomId,
-  language,
-  starterCode,
-  onCodeChange,
-}: Props) => {
+const CollaborativeEditor = ({ roomId, starterCode, onCodeChange }: Props) => {
   const { getToken, isLoaded, isSignedIn, sessionId } = useAuth();
+  const { theme } = useTheme();
   // Held in a ref so that a fresh getToken identity from Clerk cannot re-run the
   // effect below and tear down the shared document mid-session.
   const getTokenRef = useRef(getToken);
   getTokenRef.current = getToken;
 
   const editorRef = useRef<MonacoEditor | null>(null);
-  const monacoRef = useRef<Monaco | null>(null);
   const ydocRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
   const bindingRef = useRef<MonacoBinding | null>(null);
@@ -147,20 +135,8 @@ const CollaborativeEditor = ({
     }
   }, [starterCode]);
 
-  // Keep Monaco syntax highlighting in sync with the language selector
-  // without recreating the model (which would break the Yjs binding).
-  useEffect(() => {
-    if (editorRef.current && monacoRef.current) {
-      monacoRef.current.editor.setModelLanguage(
-        editorRef.current.getModel(),
-        MONACO_LANGUAGE[language] ?? "plaintext"
-      );
-    }
-  }, [language]);
-
-  const handleMount: OnMount = (editor, monaco) => {
+  const handleMount: OnMount = (editor) => {
     editorRef.current = editor;
-    monacoRef.current = monaco;
 
     if (ydocRef.current && providerRef.current) {
       createBinding(ydocRef.current, providerRef.current, editor);
@@ -172,24 +148,22 @@ const CollaborativeEditor = ({
   };
 
   return (
-    <div className="rounded-lg overflow-hidden">
-      <Editor
-        height="300px"
-        defaultLanguage={MONACO_LANGUAGE[language] ?? "plaintext"}
-        theme="vs-dark"
-        onMount={handleMount}
-        options={{
-          minimap: { enabled: false },
-          fontSize: 14,
-          lineNumbers: "on",
-          scrollBeyondLastLine: false,
-          automaticLayout: true,
-          padding: { top: 8, bottom: 8 },
-          wordWrap: "on",
-          tabSize: 4,
-        }}
-      />
-    </div>
+    <Editor
+      height="420px"
+      defaultLanguage="python"
+      theme={theme === "dark" ? "vs-dark" : "light"}
+      onMount={handleMount}
+      options={{
+        minimap: { enabled: false },
+        fontSize: 14,
+        lineNumbers: "on",
+        scrollBeyondLastLine: false,
+        automaticLayout: true,
+        padding: { top: 12, bottom: 12 },
+        wordWrap: "on",
+        tabSize: 4,
+      }}
+    />
   );
 };
 

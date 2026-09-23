@@ -65,6 +65,7 @@ def test_room_is_owned_by_the_caller_not_the_body(client, signed_up):
         headers=auth("user_alice"),
     )
     assert response.json()["createdBy"] == "user_alice"
+    assert response.json()["createdByName"] == "Alice"
 
 
 def test_submission_is_attributed_to_the_caller_not_the_body(client, room):
