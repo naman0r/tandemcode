@@ -9,15 +9,15 @@ hidden tests.
 - Clerk sign-in. Every API route and both websockets verify a session token.
 - Rooms: create, join by id, presence, chat, owner assigns a problem.
 - Shared editor: Yjs over a websocket relay, one document per room.
-- Problems: statement, starter code, public samples, hidden tests. Five of the
-  fifteen seeded problems have content.
+- Problems: statement, starter code, public samples, hidden tests, for all
+  fifteen seeded problems.
 - Run: a runner process judges Python submissions against the tests with time
   and memory limits and the room shows the verdict and the first failing test.
 
 ## What does not exist yet
 
-- Any AWS piece. The README used to plan SQS, Fargate, S3 and RDS; none of it
-  is built. The runner takes work from the submissions table. See #33.
+- A queue or separate judge hosts. The runner takes work from the submissions
+  table on the API host. See #33.
 - Complexity estimates, counterexamples, languages other than Python.
 
 ## Stack
@@ -50,7 +50,6 @@ apps/
       components/  editor, chat, members, header
       hooks/       room websocket
       lib/         API client, auth, config
-docs/history/      notes from the Spring Boot version
 infra/             production compose, Caddy, host scripts
 ```
 
@@ -126,8 +125,10 @@ as trusted as the host. Keep it on a machine that runs nothing else.
 
 ## Deploy
 
-One Lightsail host for the API, runner and Postgres, and Vercel for the web
-app. `docs/deploy.md` has every step.
+`infra/` runs the API, runner, Postgres and Caddy on one Docker host with
+`docker compose -f infra/docker-compose.prod.yml up -d --build`; settings go in
+`infra/.env` (see `infra/.env.example`). The web app is a static Vite build,
+with `apps/web/vercel.json` for Vercel.
 
 ## Contributing
 
