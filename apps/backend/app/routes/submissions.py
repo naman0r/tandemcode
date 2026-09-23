@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 
 from app.dependencies import current_user_id, get_submission_service
 from app.schemas.submissions import SubmissionResponse, SubmitRequest
@@ -14,6 +14,7 @@ router = APIRouter(prefix="/submissions", tags=["submissions"])
 @router.post("", response_model=SubmissionResponse)
 async def submit_code(
     payload: SubmitRequest,
+    request: Request,
     user_id: str = Depends(current_user_id),
     service: SubmissionService = Depends(get_submission_service),
 ) -> SubmissionResponse:
@@ -23,6 +24,10 @@ async def submit_code(
         problem_id=payload.problemId,
         language=payload.language,
         code=payload.code,
+    )
+    # The partner sees the run start; the verdict follows from the listener.
+    await request.app.state.room_chat_manager.broadcast(
+        payload.roomId, {"type": "submission", "submission": submission}
     )
     return SubmissionResponse.model_validate(submission)
 

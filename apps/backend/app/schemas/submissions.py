@@ -34,6 +34,7 @@ class SubmissionResponse(BaseModel):
     id: UUID
     roomId: str
     userId: str
+    userName: str | None
     problemId: UUID
     language: str
     code: str | None

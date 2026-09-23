@@ -5,7 +5,7 @@ from __future__ import annotations
 from app.dao.problems import ProblemDAO
 from app.dao.submissions import SubmissionDAO
 from app.runner.__main__ import judge_next
-from tests.rig import auth
+from tests.rig import auth, room_socket, roster
 
 TWO_SUM = """import sys
 lines = sys.stdin.read().split("\\n")
@@ -91,3 +91,27 @@ def test_a_run_left_running_by_a_dead_runner_is_requeued(client, room):
     assert drain_queue(client) == 1
     judged = client.get(f"/api/submissions/{submission['id']}", headers=auth("user_alice")).json()
     assert judged["status"] == "accepted"
+
+
+def next_submission_event(socket) -> dict:
+    while True:
+        event = socket.receive_json()
+        if event["type"] == "submission":
+            return event["submission"]
+
+
+def test_the_whole_room_hears_the_run_start_and_the_verdict(client, room):
+    with room_socket(client, room["id"], "user_bob") as bob:
+        roster(bob)
+
+        submitted = submit(client, room, TWO_SUM).json()
+        started = next_submission_event(bob)
+        assert started["id"] == submitted["id"]
+        assert started["status"] == "pending"
+        assert started["userName"] == "Alice"
+
+        drain_queue(client)
+        judged = next_submission_event(bob)
+        assert judged["id"] == submitted["id"]
+        assert judged["status"] == "accepted"
+        assert judged["result"]["passed"] == 5

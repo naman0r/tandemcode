@@ -8,7 +8,9 @@ import RoomMembersPanel from "../../components/RoomMembersPanel";
 import CollaborativeEditor from "../../components/CollaborativeEditor";
 import { useUser } from "../../hooks/useUser";
 import useWebSocket from "../../hooks/UseWebSocket";
+import type { Submission } from "../../hooks/UseWebSocket";
 import { problemApi, roomApi, submissionApi } from "../../lib/api";
+import { timeAgo } from "../../lib/format";
 import { badge, button, card, difficulty, muted } from "../../lib/ui";
 
 type Problem = {
@@ -23,22 +25,6 @@ type Problem = {
   samples: { input: string; expected: string }[];
 };
 
-type TestOutcome = {
-  index: number;
-  hidden: boolean;
-  passed: boolean;
-  timeMs: number;
-  stdout: string;
-  stderr: string;
-};
-
-type Submission = {
-  id: string;
-  status: string;
-  createdAt: string;
-  result: { passed: number; total: number; timeMs: number; tests: TestOutcome[] } | null;
-};
-
 type Room = {
   id: string;
   name: string;
@@ -49,7 +35,6 @@ type Room = {
 };
 
 const PENDING_STATUSES = new Set(["pending", "running"]);
-const POLL_MS = 1000;
 
 const STATUS_TONE: Record<string, string> = {
   pending: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300",
@@ -68,6 +53,7 @@ const VerdictPanel = ({ submission }: { submission: Submission }) => {
   return (
     <div className="space-y-2 border-t border-zinc-200 px-4 py-3 text-sm dark:border-zinc-800">
       <div className="flex flex-wrap items-center gap-2">
+        <span className="font-medium">{submission.userName ?? "Someone"}</span>
         <span className={badge(STATUS_TONE[submission.status])}>
           {submission.status.replace(/_/g, " ")}
         </span>
@@ -93,6 +79,47 @@ const VerdictPanel = ({ submission }: { submission: Submission }) => {
     </div>
   );
 };
+
+const RunHistory = ({
+  submissions,
+  selectedId,
+  onSelect,
+}: {
+  submissions: Submission[];
+  selectedId: string | null;
+  onSelect: (submission: Submission) => void;
+}) => (
+  <section className={`${card} p-4`}>
+    <h2 className="mb-3 font-semibold">Runs</h2>
+    {submissions.length === 0 ? (
+      <p className={`${muted} text-sm`}>No runs yet.</p>
+    ) : (
+      <ul className="max-h-64 space-y-1 overflow-y-auto">
+        {submissions.map((submission) => (
+          <li key={submission.id}>
+            <button
+              type="button"
+              onClick={() => onSelect(submission)}
+              className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
+                submission.id === selectedId ? "bg-zinc-100 dark:bg-zinc-800" : ""
+              }`}
+            >
+              <span className="truncate">
+                {submission.userName ?? "Someone"}
+                <span className={`${muted} ml-2 text-xs`}>{timeAgo(submission.createdAt)}</span>
+              </span>
+              <span className={badge(STATUS_TONE[submission.status])}>
+                {submission.result
+                  ? `${submission.result.passed}/${submission.result.total}`
+                  : submission.status.replace(/_/g, " ")}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    )}
+  </section>
+);
 
 const InviteButton = ({ roomId }: { roomId: string }) => {
   const [copied, setCopied] = useState(false);
@@ -189,15 +216,17 @@ const Room = ({ roomId }: { roomId: string }) => {
   const [loading, setLoading] = useState(true);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [code, setCode] = useState("");
-  const [lastSubmission, setLastSubmission] = useState<Submission | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [picking, setPicking] = useState(false);
 
-  const { isConnected, connectionState, messages, members, sendMessage } = useWebSocket(
-    room?.id ?? ""
-  );
+  const { isConnected, connectionState, messages, members, submissions, seedSubmissions, sendMessage } =
+    useWebSocket(room?.id ?? "");
   const isOwner = room?.createdBy === user?.id;
-  const running = submitting || (lastSubmission !== null && PENDING_STATUSES.has(lastSubmission.status));
+  // Explicit selection wins; otherwise the newest run is what the room is looking at.
+  const shown = submissions.find((item) => item.id === selectedId) ?? submissions[0] ?? null;
+  const running =
+    submitting || submissions.some((item) => item.userId === user?.id && PENDING_STATUSES.has(item.status));
 
   useEffect(() => {
     setLoading(true);
@@ -216,18 +245,17 @@ const Room = ({ roomId }: { roomId: string }) => {
     problemApi.getProblem(room.currentProblemId).then(setProblem).catch(() => setProblem(null));
   }, [room?.currentProblemId]);
 
-  // The runner writes the verdict to the row; the room finds out by asking.
+  // Verdicts arrive over the socket. History, and anything missed while
+  // disconnected, comes from the API each time the socket is (re)established.
   useEffect(() => {
-    if (!lastSubmission || !PENDING_STATUSES.has(lastSubmission.status)) return;
-    const timer = setInterval(async () => {
-      try {
-        setLastSubmission(await submissionApi.getSubmission(lastSubmission.id));
-      } catch (err) {
-        console.error("Failed to poll submission:", err);
-      }
-    }, POLL_MS);
-    return () => clearInterval(timer);
-  }, [lastSubmission]);
+    if (!room?.id || !isConnected) return;
+    submissionApi
+      .getSubmissionsForRoom(room.id)
+      .then(seedSubmissions)
+      .catch((err) => console.error("Failed to load runs:", err));
+    // seedSubmissions is a stable setter wrapper; re-running on it would refetch every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room?.id, isConnected]);
 
   const pickProblem = async (chosen: Problem) => {
     try {
@@ -241,10 +269,9 @@ const Room = ({ roomId }: { roomId: string }) => {
   const run = async () => {
     if (!problem) return;
     setSubmitting(true);
+    setSelectedId(null);
     try {
-      setLastSubmission(
-        await submissionApi.submit({ roomId, problemId: problem.id, language: "python", code })
-      );
+      await submissionApi.submit({ roomId, problemId: problem.id, language: "python", code });
     } catch (err) {
       console.error("Submission failed:", err);
     } finally {
@@ -306,7 +333,7 @@ const Room = ({ roomId }: { roomId: string }) => {
               starterCode={problem?.starterCode}
               onCodeChange={setCode}
             />
-            {lastSubmission && <VerdictPanel submission={lastSubmission} />}
+            {shown && <VerdictPanel submission={shown} />}
           </section>
 
           <section className={`${card} p-5`}>
@@ -355,6 +382,11 @@ const Room = ({ roomId }: { roomId: string }) => {
 
         <div className="space-y-6">
           <RoomMembersPanel members={members} connectionState={connectionState} />
+          <RunHistory
+            submissions={submissions}
+            selectedId={shown?.id ?? null}
+            onSelect={(submission) => setSelectedId(submission.id)}
+          />
           <RoomChatComponent isConnected={isConnected} messages={messages} sendMessage={sendMessage} />
         </div>
       </div>

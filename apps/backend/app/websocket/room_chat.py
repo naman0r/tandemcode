@@ -103,7 +103,7 @@ class RoomChatManager:
         if not isinstance(text, str) or not text.strip():
             return
 
-        await self._broadcast(
+        await self.broadcast(
             room_id,
             {
                 "type": "chat",
@@ -158,10 +158,10 @@ class RoomChatManager:
             logger.exception("Failed to read members for room %s", room_id)
             return
 
-        await self._broadcast(room_id, {"type": "presence", "members": members})
+        await self.broadcast(room_id, {"type": "presence", "members": members})
 
-    async def _broadcast(self, room_id: str, event: dict) -> None:
-        # default=str renders joined_at, which is a datetime.
+    async def broadcast(self, room_id: str, event: dict) -> None:
+        # default=str renders datetimes and UUIDs.
         message = json.dumps(event, default=str)
         for session in list(self.room_sessions.get(room_id, {})):
             try:
