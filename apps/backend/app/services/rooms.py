@@ -105,17 +105,15 @@ class RoomService:
                 detail=f"User not found: {created_by}",
             )
 
-        if (
-            await self.room_dao.count_created_since(created_by, 3600) >= ROOMS_PER_HOUR
-            or await self.room_dao.count_created_since(created_by, 86400) >= ROOMS_PER_DAY
-        ):
+        room = await self.room_dao.create(
+            str(uuid4()), name, description, created_by, visibility, advertised, ROOMS_PER_HOUR, ROOMS_PER_DAY
+        )
+        if room is None:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too many new rooms. Try again later.",
             )
-
-        room_id = str(uuid4())
-        return await self.room_dao.create(room_id, name, description, created_by, visibility, advertised)
+        return room
 
     async def get_room(self, room_id: str) -> dict:
         return await get_active_room(self.room_dao, room_id)

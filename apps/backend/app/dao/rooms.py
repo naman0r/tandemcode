@@ -21,6 +21,10 @@ SELECT_ROOM = """
 """
 
 
+# First key of the per-creator advisory lock taken while creating a room.
+ROOM_LIMIT_LOCK = 1
+
+
 def _map_room(row: asyncpg.Record) -> dict:
     return {
         "id": row["id"],
@@ -49,13 +53,31 @@ class RoomDAO:
         created_by: str,
         visibility: str,
         advertised: bool,
-    ) -> dict:
-        query = """
+        per_hour: int,
+        per_day: int,
+    ) -> dict | None:
+        """Create the room, or return None if its creator is over a limit.
+
+        The count and the insert share a transaction holding a lock on the
+        creator, so requests sent together cannot all pass the count.
+        """
+        count = """
+            SELECT COUNT(*) FROM rooms
+            WHERE created_by = $1 AND created_at > NOW() - make_interval(secs => $2)
+        """
+        insert = """
             INSERT INTO rooms (id, name, description, created_by, visibility, advertised)
             VALUES ($1, $2, $3, $4, $5, $6)
         """
         async with self.pool.acquire() as conn:
-            await conn.execute(query, room_id, name, description, created_by, visibility, advertised)
+            async with conn.transaction():
+                await conn.execute("SELECT pg_advisory_xact_lock($1, hashtext($2))", ROOM_LIMIT_LOCK, created_by)
+                if (
+                    await conn.fetchval(count, created_by, 3600) >= per_hour
+                    or await conn.fetchval(count, created_by, 86400) >= per_day
+                ):
+                    return None
+                await conn.execute(insert, room_id, name, description, created_by, visibility, advertised)
         return await self.get_by_id(room_id)
 
     async def get_by_id(self, room_id: str) -> dict | None:
@@ -94,14 +116,6 @@ class RoomDAO:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(query, user_id, active)
         return [_map_room(row) for row in rows]
-
-    async def count_created_since(self, user_id: str, seconds: int) -> int:
-        query = """
-            SELECT COUNT(*) FROM rooms
-            WHERE created_by = $1 AND created_at > NOW() - make_interval(secs => $2)
-        """
-        async with self.pool.acquire() as conn:
-            return await conn.fetchval(query, user_id, seconds)
 
     async def exists(self, room_id: str) -> bool:
         query = "SELECT EXISTS(SELECT 1 FROM rooms WHERE id = $1)"
