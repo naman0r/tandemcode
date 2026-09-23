@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from app.dao.problems import ProblemDAO
 from app.dao.submissions import SubmissionDAO
 from app.runner.__main__ import judge_next
@@ -115,3 +117,9 @@ def test_the_whole_room_hears_the_run_start_and_the_verdict(client, room):
         assert judged["id"] == submitted["id"]
         assert judged["status"] == "accepted"
         assert judged["result"]["passed"] == 5
+
+        # Browsers only promise to parse ISO 8601 with a "T"; a space breaks
+        # Safari and puts live runs out of order against the fetched history.
+        listed = client.get(f"/api/submissions/room/{room['id']}", headers=auth("user_alice")).json()
+        assert "T" in judged["createdAt"]
+        assert datetime.fromisoformat(judged["createdAt"]) == datetime.fromisoformat(listed[0]["createdAt"])

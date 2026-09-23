@@ -41,7 +41,9 @@ export interface Submission {
 // Newest first; a submission arrives once as pending and again judged.
 const upsert = (list: Submission[], next: Submission): Submission[] => {
   const rest = list.filter((item) => item.id !== next.id);
-  return [next, ...rest].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  // Compare instants, not strings: the API and the socket may format the
+  // same time differently ("Z" vs "+00:00").
+  return [next, ...rest].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 };
 
 // Backoff for an unexpected drop. Bounded: a handshake the server refuses on
