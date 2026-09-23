@@ -132,4 +132,5 @@ with `apps/web/vercel.json` for Vercel.
 
 ## Contributing
 
-`AGENTS.md` has the rules for agents and the same checks as above.
+`CONTRIBUTING.md` covers pull requests and how to add a problem. `AGENTS.md`
+has the rules for agents and the same checks as above.

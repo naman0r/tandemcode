@@ -28,11 +28,12 @@ def test_multi_line_expected_output_survives_the_round_trip(client, signed_up):
     assert response.json()["samples"][0]["expected"] == "-1 -1 2\n-1 0 1"
 
 
-def test_every_seeded_problem_is_complete(client, signed_up):
+def test_every_problem_is_complete(client, signed_up):
     signed_up("user_alice")
     problems = client.get("/api/problems", headers=auth("user_alice")).json()
-    assert len(problems) == 15
+    assert len(problems) >= 15
     for problem in problems:
+        assert problem["difficulty"] in {"easy", "medium", "hard"}, problem["slug"]
         assert problem["statement"], problem["slug"]
         assert problem["starterCode"], problem["slug"]
         assert len(problem["samples"]) >= 2, problem["slug"]
