@@ -282,3 +282,25 @@ def test_a_room_stops_taking_chat_at_its_cap(client, room, monkeypatch):
     events = client.get(f"/api/rooms/{room['id']}/replay", headers=auth("user_alice")).json()["events"]
     assert [e["payload"]["text"] for e in events if e["type"] == "chat"] == ["first"]
 
+
+def test_one_user_cannot_hold_sockets_across_unlimited_rooms(client, room):
+    from contextlib import ExitStack
+
+    from app.websocket.room_chat import MAX_SOCKETS_PER_USER, MAX_SOCKETS_PER_USER_TOTAL
+
+    rooms = [room] + [
+        client.post("/api/rooms", json={"name": f"r{i}"}, headers=auth("user_alice")).json() for i in range(4)
+    ]
+    with ExitStack() as stack:
+        opened = 0
+        for each in rooms:
+            for _ in range(MAX_SOCKETS_PER_USER):
+                if opened == MAX_SOCKETS_PER_USER_TOTAL:
+                    break
+                stack.enter_context(connect(client, each["id"], "user_alice"))
+                opened += 1
+        # The last room has none of her sockets, so only the total can refuse.
+        with pytest.raises(WebSocketDisconnect):
+            with connect(client, rooms[-1]["id"], "user_alice"):
+                pass
+

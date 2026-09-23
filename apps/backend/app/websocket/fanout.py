@@ -36,7 +36,7 @@ async def fan_out(
     async def one(websocket: WebSocket) -> None:
         try:
             await asyncio.wait_for(send(websocket), SEND_TIMEOUT_SECONDS)
-        except Exception:
+        except TimeoutError:
             if websocket in stalled:
                 return
             stalled.add(websocket)
@@ -45,5 +45,9 @@ async def fan_out(
                 await asyncio.wait_for(
                     websocket.close(code=status.WS_1011_INTERNAL_ERROR), SEND_TIMEOUT_SECONDS
                 )
+        except Exception:
+            # A socket that is closing, or joined but not yet accepted, raises
+            # here. Its own handler cleans it up; it is not stalled.
+            logger.debug("Send to a socket failed", exc_info=True)
 
     await asyncio.gather(*(one(websocket) for websocket in sockets if websocket not in stalled))

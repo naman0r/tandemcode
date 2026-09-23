@@ -25,6 +25,9 @@ CHAT_WINDOW_SECONDS = 10.0
 MAX_CHAT_MESSAGES_PER_ROOM = 2000
 # Two tabs and a reconnect that overlaps the socket it replaces.
 MAX_SOCKETS_PER_USER = 3
+# Across every room: enough for a few rooms open in tabs, far short of the
+# server's connection limit however many rooms one account can enter.
+MAX_SOCKETS_PER_USER_TOTAL = 10
 
 
 class RoomChatManager:
@@ -54,10 +57,18 @@ class RoomChatManager:
     ) -> None:
         # Every join rebroadcasts the roster to every socket in the room, so an
         # unbounded number of sockets from one user is quadratic work.
-        open_sockets = sum(
-            1 for other in self.room_sessions.get(room_id, {}).values() if other.user_id == participant.user_id
-        )
-        if open_sockets >= MAX_SOCKETS_PER_USER:
+        # Counted and recorded with no await in between, so handshakes that
+        # arrive together cannot all pass the check.
+        users = [
+            (room, other.user_id)
+            for room, sessions in self.room_sessions.items()
+            for other in sessions.values()
+            if other.user_id == participant.user_id
+        ]
+        if (
+            sum(1 for room, _ in users if room == room_id) >= MAX_SOCKETS_PER_USER
+            or len(users) >= MAX_SOCKETS_PER_USER_TOTAL
+        ):
             raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Too many connections")
 
         # Recorded before the first await, so anything that fails below unwinds
