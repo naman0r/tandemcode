@@ -184,9 +184,12 @@ const Rooms = () => {
             <p className="text-gray-600 mb-6">
               Be the first to create a coding room!
             </p>
-            <button className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors">
+            <Link
+              to="/rooms/create"
+              className="bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+            >
               Create your first room
-            </button>
+            </Link>
           </div>
         )}
       </div>
