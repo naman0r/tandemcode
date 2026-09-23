@@ -214,3 +214,17 @@ def test_verdicts_keep_arriving_after_the_listener_connection_drops(client, room
             pass
         assert event["status"] == "accepted"
 
+
+def test_only_people_who_were_in_the_room_can_read_its_runs(client, room, signed_up):
+    submitted = submit(client, room, TWO_SUM).json()
+    signed_up("user_mallory")
+    for path in (f"/api/submissions/room/{room['id']}", f"/api/submissions/{submitted['id']}"):
+        assert client.get(path, headers=auth("user_mallory")).status_code == 403
+        assert client.get(path, headers=auth("user_alice")).status_code == 200
+    assert client.get(f"/api/rooms/{room['id']}/members", headers=auth("user_mallory")).status_code == 403
+
+    # Having been in the room is enough, the way it is for the replay.
+    with room_socket(client, room["id"], "user_mallory"):
+        pass
+    assert client.get(f"/api/submissions/room/{room['id']}", headers=auth("user_mallory")).status_code == 200
+

@@ -36,16 +36,18 @@ async def submit_code(
 async def list_submissions(
     room_id: str,
     userId: str | None = Query(default=None),
+    caller_id: str = Depends(current_user_id),
     service: SubmissionService = Depends(get_submission_service),
 ) -> list[SubmissionResponse]:
-    submissions = await service.list_submissions(room_id, userId)
+    submissions = await service.list_submissions(room_id, caller_id, userId)
     return [SubmissionResponse.model_validate(submission) for submission in submissions]
 
 
 @router.get("/{submission_id}", response_model=SubmissionResponse)
 async def get_submission(
     submission_id: UUID,
+    caller_id: str = Depends(current_user_id),
     service: SubmissionService = Depends(get_submission_service),
 ) -> SubmissionResponse:
-    submission = await service.get_submission(submission_id)
+    submission = await service.get_submission(submission_id, caller_id)
     return SubmissionResponse.model_validate(submission)

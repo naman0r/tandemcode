@@ -8,7 +8,7 @@ from app.dao.room_members import RoomMemberDAO
 from app.dao.rooms import RoomDAO
 from app.dao.submissions import SubmissionDAO
 from app.dao.users import UserDAO
-from app.services.rooms import get_active_room
+from app.services.rooms import ensure_room_member, get_active_room
 
 # The runner executes with the Python interpreter it ships with. Other
 # languages need their own image and are a later ticket.
@@ -86,18 +86,20 @@ class SubmissionService:
                 detail="Wait for your current run to finish",
             ) from exc
 
-    async def get_submission(self, submission_id) -> dict:
+    async def get_submission(self, submission_id, caller_id: str) -> dict:
         submission = await self.submission_dao.get_by_id(submission_id)
         if not submission:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Submission not found: {submission_id}",
             )
-        await get_active_room(self.room_dao, submission["roomId"])
+        room = await get_active_room(self.room_dao, submission["roomId"])
+        await ensure_room_member(self.room_member_dao, room, caller_id)
         return submission
 
-    async def list_submissions(self, room_id: str, user_id: str | None = None) -> list[dict]:
-        await get_active_room(self.room_dao, room_id)
+    async def list_submissions(self, room_id: str, caller_id: str, user_id: str | None = None) -> list[dict]:
+        room = await get_active_room(self.room_dao, room_id)
+        await ensure_room_member(self.room_member_dao, room, caller_id)
         if user_id:
             return await self.submission_dao.list_by_room_and_user(room_id, user_id)
         return await self.submission_dao.list_by_room(room_id)
