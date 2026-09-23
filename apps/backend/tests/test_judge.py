@@ -93,3 +93,10 @@ def test_long_expected_output_can_still_pass():
     verdict = judge("print('y' * 10000)\n", long_tests, 2000, 256)
     assert verdict.status == ACCEPTED
     assert verdict.tests[0].stdout.endswith("[output truncated]")
+
+
+def test_hidden_test_timing_is_not_reported():
+    """Otherwise sleep(ord(byte)) spells out the hidden input."""
+    verdict = judge("import time\ntime.sleep(0.2)\na, b = map(int, input().split())\nprint(a + b)\n", TESTS, 2000, 256)
+    assert verdict.tests[1].hidden and verdict.tests[1].timeMs == 0
+    assert verdict.timeMs == verdict.tests[0].timeMs

@@ -50,7 +50,9 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
-      SANDBOX_IMAGE: python:3.11-slim
+      # Pinned by digest: the runner holds the Docker socket, so the image it
+      # pulls on every start must not change under it. Bump deliberately.
+      SANDBOX_IMAGE: python:3.11-slim@sha256:da047cb8f9d1d98e5c070f5300ba9f7274e33b8fc0e5be5ed88740aed1b95ba9
       # gVisor, installed on the host by infra/install-gvisor.sh.
       SANDBOX_RUNTIME: runsc
     # Starts one judge container per submission through the host's Docker

@@ -70,4 +70,4 @@ async def room_participant(
             code=status.WS_1008_POLICY_VIOLATION, reason=exc.detail
         ) from exc
 
-    return Participant(user_id=user_id, display_name=user["name"] or user["email"])
+    return Participant(user_id=user_id, display_name=user["name"] or "Someone")

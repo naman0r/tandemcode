@@ -74,9 +74,10 @@ def _clip(text: bytes) -> str:
 
 def _outcome(index: int, test: dict, passed: bool, elapsed: int, stdout: bytes, stderr: bytes) -> TestOutcome:
     hidden = bool(test.get("hidden"))
-    # A failing hidden test's output can echo its stdin, which is the test.
+    # A failing hidden test's output can echo its stdin, which is the test,
+    # and so can its running time, a byte at a time through sleep().
     if hidden:
-        return TestOutcome(index, True, passed, elapsed, "", "")
+        return TestOutcome(index, True, passed, 0, "", "")
     return TestOutcome(index, False, passed, elapsed, _clip(stdout), _clip(stderr))
 
 
@@ -109,7 +110,8 @@ def judge(code: str, tests: list[dict], time_limit_ms: int, mem_limit_mb: int) -
                 break
 
             elapsed = int((time.perf_counter() - started) * 1000)
-            verdict.timeMs = max(verdict.timeMs, elapsed)
+            if not test.get("hidden"):
+                verdict.timeMs = max(verdict.timeMs, elapsed)
             passed = (
                 completed.returncode == 0
                 and completed.stdout.decode("utf-8", errors="replace").strip()

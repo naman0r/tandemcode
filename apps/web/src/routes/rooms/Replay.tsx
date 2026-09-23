@@ -29,10 +29,16 @@ const decode = (base64: string): Uint8Array =>
 
 // The relay stored the framed sync messages it forwarded. Feeding them to a
 // fresh document in order rebuilds the text as it was after each keystroke.
+// Frames are whatever a client sent, so one that does not parse is skipped
+// rather than allowed to blank the whole replay.
 const applyFramed = (doc: Y.Doc, framed: Uint8Array) => {
-  const decoder = decoding.createDecoder(framed);
-  decoding.readVarUint(decoder);
-  readSyncMessage(decoder, encoding.createEncoder(), doc, null);
+  try {
+    const decoder = decoding.createDecoder(framed);
+    decoding.readVarUint(decoder);
+    readSyncMessage(decoder, encoding.createEncoder(), doc, null);
+  } catch (err) {
+    console.warn("Skipped a replay frame that did not parse:", err);
+  }
 };
 
 const clock = (ms: number) => {

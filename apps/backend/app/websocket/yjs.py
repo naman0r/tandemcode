@@ -27,16 +27,15 @@ DOCUMENT_CHANGE_PREFIXES = (b"\x00\x01", b"\x00\x02")
 MAX_FRAME_BYTES = 256 * 1024
 
 # A long session stores well under a megabyte. Past this a room keeps relaying
-# but stops recording, so no one socket can fill the disk.
-# ponytail: counted per process, so a restart resets it.
-MAX_RECORDED_BYTES_PER_ROOM = 16 * 1024 * 1024
+# but stops recording, so no one socket can fill the disk, and a replay stays
+# small enough to send in one response.
+MAX_RECORDED_BYTES_PER_ROOM = 4 * 1024 * 1024
 
 
 class YjsRelayManager:
     def __init__(self, updates: RoomUpdateDAO) -> None:
         # Socket to the user it belongs to, so a leave can close that user's.
         self.room_sessions: dict[str, dict[WebSocket, str]] = defaultdict(dict)
-        self.recorded_bytes: dict[str, int] = defaultdict(int)
         self.updates = updates
 
     async def connect(
@@ -65,7 +64,6 @@ class YjsRelayManager:
     async def close_room(self, room_id: str) -> None:
         for websocket in list(self.room_sessions.get(room_id, {})):
             await self._close(websocket, room_id)
-        self.recorded_bytes.pop(room_id, None)
 
     async def _close(self, websocket: WebSocket, room_id: str) -> None:
         self.disconnect(websocket, room_id)
@@ -97,10 +95,5 @@ class YjsRelayManager:
             except Exception:
                 logger.exception("Failed to relay Yjs binary message for room %s", room_id)
         # After the relay so a slow disk never delays a keystroke reaching a peer.
-        if not payload.startswith(DOCUMENT_CHANGE_PREFIXES):
-            return
-        if self.recorded_bytes[room_id] + len(payload) > MAX_RECORDED_BYTES_PER_ROOM:
-            logger.warning("Room %s reached its replay size limit; not recording", room_id)
-            return
-        self.recorded_bytes[room_id] += len(payload)
-        await self.updates.record(room_id, payload)
+        if payload.startswith(DOCUMENT_CHANGE_PREFIXES):
+            await self.updates.record(room_id, payload, MAX_RECORDED_BYTES_PER_ROOM)

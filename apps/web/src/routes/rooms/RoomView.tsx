@@ -382,7 +382,7 @@ const Room = ({ roomId }: { roomId: string }) => {
             {user && (
               <CollaborativeEditor
                 roomId={roomId}
-                user={{ id: user.id, name: user.name || user.email }}
+                user={{ id: user.id, name: user.name || "Someone" }}
                 starterCode={problem?.starterCode}
                 onCodeChange={setCode}
               />

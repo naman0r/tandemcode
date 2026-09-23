@@ -123,3 +123,22 @@ def test_unknown_signing_keys_cannot_force_repeated_jwks_fetches(client):
         bogus = token(kid=f"unknown-{attempt}")
         assert client.get("/api/rooms", headers={"Authorization": f"Bearer {bogus}"}).status_code == 401
     assert len(JWKS_FETCHES) - before <= 1
+
+
+def test_profile_sync_calls_clerk_at_most_once_a_minute(client, monkeypatch):
+    calls = []
+
+    async def fetch_profile(user_id: str) -> tuple[str, str]:
+        calls.append(user_id)
+        return "erin@example.com", "Erin"
+
+    monkeypatch.setattr("app.services.users.fetch_profile", fetch_profile)
+    for _ in range(3):
+        assert client.post("/api/users", headers=auth("user_erin")).status_code == 200
+    assert calls == ["user_erin"]
+
+
+def test_display_name_never_falls_back_to_the_email():
+    from app.core.clerk import _display_name
+
+    assert _display_name({"id": "user_abc123", "email_addresses": [{"email_address": "john.smith@example.com"}]}) == "User c123"
