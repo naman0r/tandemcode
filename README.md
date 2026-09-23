@@ -72,7 +72,14 @@ npm install
 npm run dev                  # http://localhost:5173
 ```
 
-Migrations run when the API starts. To run the API outside Docker instead:
+Migrations run when the API starts. The runner waits for the API's health
+check, so it never sees a half-migrated schema.
+
+To serve the built web app from nginx instead of Vite, add
+`VITE_CLERK_PUBLISHABLE_KEY` to apps/backend/.env and run
+`docker compose --profile prod up -d --build`. The app is on port 3000.
+
+To run the API outside Docker instead:
 
 ```bash
 cd apps/backend
