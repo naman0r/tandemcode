@@ -4,6 +4,7 @@ import { useAuth } from "@clerk/clerk-react";
 import { UserContext } from "../hooks/useUser";
 import type { BackendUser } from "../hooks/useUser";
 import { userApi } from "./api";
+import { muted } from "./ui";
 
 type State =
   | { status: "pending" }
@@ -11,7 +12,7 @@ type State =
   | { status: "failed"; message: string };
 
 const Notice = ({ children }: { children: ReactNode }) => (
-  <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 text-gray-600">
+  <div className={`${muted} flex min-h-screen items-center justify-center text-sm`}>
     {children}
   </div>
 );

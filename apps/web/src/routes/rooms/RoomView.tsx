@@ -1,13 +1,15 @@
-import { useState, useEffect } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
-import { useUser } from "@clerk/clerk-react";
-import Header from "../../components/Header";
-import Footer from "../../components/Footer";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { Check, Link2 } from "lucide-react";
+import Layout from "../../components/Layout";
+import RequireSignIn from "../../components/RequireSignIn";
 import RoomChatComponent from "../../components/RoomChatComponent";
 import RoomMembersPanel from "../../components/RoomMembersPanel";
 import CollaborativeEditor from "../../components/CollaborativeEditor";
-import { roomApi, problemApi, submissionApi } from "../../lib/api";
+import { useUser } from "../../hooks/useUser";
 import useWebSocket from "../../hooks/UseWebSocket";
+import { problemApi, roomApi, submissionApi } from "../../lib/api";
+import { badge, button, card, difficulty, muted } from "../../lib/ui";
 
 type Problem = {
   id: string;
@@ -33,84 +35,77 @@ type TestOutcome = {
 type Submission = {
   id: string;
   status: string;
-  language: string;
   createdAt: string;
-  result: {
-    passed: number;
-    total: number;
-    timeMs: number;
-    tests: TestOutcome[];
-  } | null;
+  result: { passed: number; total: number; timeMs: number; tests: TestOutcome[] } | null;
 };
-
-const PENDING_STATUSES = new Set(["pending", "running"]);
-const POLL_MS = 1000;
 
 type Room = {
   id: string;
   name: string;
   description: string | null;
   createdBy: string;
+  createdByName: string | null;
   currentProblemId: string | null;
 };
 
-const DIFFICULTY_COLORS: Record<string, string> = {
-  easy: "text-green-600 bg-green-50 border-green-200",
-  medium: "text-yellow-600 bg-yellow-50 border-yellow-200",
-  hard: "text-red-600 bg-red-50 border-red-200",
+const PENDING_STATUSES = new Set(["pending", "running"]);
+const POLL_MS = 1000;
+
+const STATUS_TONE: Record<string, string> = {
+  pending: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300",
+  running: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-300",
+  accepted: difficulty.easy,
+  wrong_answer: difficulty.hard,
+  runtime_error: difficulty.hard,
+  time_limit_exceeded: difficulty.hard,
 };
 
-const STATUS_COLORS: Record<string, string> = {
-  pending: "text-yellow-600 bg-yellow-50",
-  running: "text-blue-600 bg-blue-50",
-  accepted: "text-green-600 bg-green-50",
-  wrong_answer: "text-red-600 bg-red-50",
-  runtime_error: "text-red-600 bg-red-50",
-  time_limit_exceeded: "text-red-600 bg-red-50",
-};
+const pre = "whitespace-pre-wrap rounded-md border border-zinc-200 bg-zinc-50 p-2 font-mono text-xs dark:border-zinc-800 dark:bg-zinc-950";
 
 const VerdictPanel = ({ submission }: { submission: Submission }) => {
   const { result } = submission;
   const failed = result?.tests.find((test) => !test.passed);
   return (
-    <div className="mt-3 text-sm space-y-2">
-      <div className="flex items-center space-x-2">
-        <span className="text-gray-500">Last run:</span>
-        <span
-          className={`px-2 py-0.5 rounded-full font-medium capitalize ${
-            STATUS_COLORS[submission.status] ?? "text-gray-600 bg-gray-50"
-          }`}
-        >
+    <div className="space-y-2 border-t border-zinc-200 px-4 py-3 text-sm dark:border-zinc-800">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={badge(STATUS_TONE[submission.status])}>
           {submission.status.replace(/_/g, " ")}
         </span>
         {result && (
-          <span className="text-gray-600">
-            {result.passed}/{result.total} tests passed in {result.timeMs}ms
+          <span className={muted}>
+            {result.passed}/{result.total} tests passed in {result.timeMs} ms
           </span>
         )}
-        <span className="text-gray-400 text-xs">
+        <span className={`${muted} text-xs`}>
           {new Date(submission.createdAt).toLocaleTimeString()}
         </span>
       </div>
       {failed && (
-        <div className="border border-red-200 bg-red-50 rounded p-3 space-y-2">
-          <p className="text-red-700 font-medium">
+        <div className="space-y-2">
+          <p className="text-red-700 dark:text-red-300">
             Test {failed.index + 1}
             {failed.hidden ? " (hidden)" : ""} failed
           </p>
-          {failed.stdout && (
-            <pre className="bg-white border border-gray-200 rounded p-2 whitespace-pre-wrap text-gray-800">
-              {failed.stdout}
-            </pre>
-          )}
-          {failed.stderr && (
-            <pre className="bg-white border border-gray-200 rounded p-2 whitespace-pre-wrap text-red-800">
-              {failed.stderr}
-            </pre>
-          )}
+          {failed.stdout && <pre className={pre}>{failed.stdout}</pre>}
+          {failed.stderr && <pre className={`${pre} text-red-700 dark:text-red-300`}>{failed.stderr}</pre>}
         </div>
       )}
     </div>
+  );
+};
+
+const InviteButton = ({ roomId }: { roomId: string }) => {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    await navigator.clipboard.writeText(`${window.location.origin}/rooms/${roomId}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button type="button" onClick={copy} className={button.secondary}>
+      {copied ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
+      {copied ? "Copied" : "Copy invite link"}
+    </button>
   );
 };
 
@@ -118,7 +113,7 @@ const LeaveRoomButton = ({ roomId }: { roomId: string }) => {
   const navigate = useNavigate();
   const [leaving, setLeaving] = useState(false);
 
-  const handleLeave = async () => {
+  const leave = async () => {
     setLeaving(true);
     try {
       await roomApi.leaveRoom(roomId);
@@ -135,92 +130,91 @@ const LeaveRoomButton = ({ roomId }: { roomId: string }) => {
   };
 
   return (
-    <button
-      onClick={handleLeave}
-      disabled={leaving}
-      className="bg-red-50 text-red-700 px-4 py-2 rounded-lg hover:bg-red-100 transition-colors border border-red-200 text-sm disabled:opacity-50"
-    >
-      {leaving ? "Leaving..." : "Leave room"}
+    <button type="button" onClick={leave} disabled={leaving} className={button.danger}>
+      {leaving ? "Leaving..." : "Leave"}
     </button>
   );
 };
 
-const RoomView = () => {
-  const { roomId } = useParams();
-  const { user } = useUser();
-
-  const [roomData, setRoomData] = useState<Room | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [roomError, setRoomError] = useState<string | null>(null);
-  const [currentProblem, setCurrentProblem] = useState<Problem | null>(null);
-  const [code, setCode] = useState("# Write your solution here\n");
-  const [language, setLanguage] = useState("python");
-  const [lastSubmission, setLastSubmission] = useState<Submission | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showProblemPicker, setShowProblemPicker] = useState(false);
-  const [availableProblems, setAvailableProblems] = useState<Problem[]>([]);
-  const [loadingProblems, setLoadingProblems] = useState(false);
-
-  const { isConnected, connectionState, messages, members, sendMessage } =
-    useWebSocket(roomData?.id ?? "");
-  const isRoomCreator = roomData?.createdBy === user?.id;
-
-  // Fetch room data
+const ProblemPicker = ({
+  onPick,
+  onClose,
+}: {
+  onPick: (problem: Problem) => void;
+  onClose: () => void;
+}) => {
+  const [problems, setProblems] = useState<Problem[] | null>(null);
   useEffect(() => {
-    const fetchRoom = async () => {
-      if (!roomId) return;
-      try {
-        setLoading(true);
-        setRoomError(null);
-        const room = await roomApi.getRoom(roomId);
-        setRoomData(room);
-      } catch (err) {
-        console.error("Error fetching room:", err);
-        setRoomData(null);
-        setRoomError("This room may be closed or no longer exist.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRoom();
+    problemApi.getAllProblems().then(setProblems).catch(() => setProblems([]));
+  }, []);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        className={`${card} flex max-h-[70vh] w-full max-w-lg flex-col shadow-xl`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-3 dark:border-zinc-800">
+          <h2 className="font-semibold">Choose a problem</h2>
+          <button type="button" onClick={onClose} className={button.ghost}>
+            Close
+          </button>
+        </div>
+        <div className="overflow-y-auto">
+          {problems === null && <p className={`${muted} p-5 text-sm`}>Loading...</p>}
+          {problems?.map((problem) => (
+            <button
+              key={problem.id}
+              type="button"
+              onClick={() => onPick(problem)}
+              className="flex w-full items-center justify-between border-b border-zinc-100 px-5 py-3 text-left text-sm hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800"
+            >
+              <span>
+                {problem.title}
+                {!problem.statement && <span className={`${muted} ml-2 text-xs`}>no tests yet</span>}
+              </span>
+              <span className={badge(difficulty[problem.difficulty])}>{problem.difficulty}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Room = ({ roomId }: { roomId: string }) => {
+  const user = useUser();
+
+  const [room, setRoom] = useState<Room | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [problem, setProblem] = useState<Problem | null>(null);
+  const [code, setCode] = useState("");
+  const [lastSubmission, setLastSubmission] = useState<Submission | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [picking, setPicking] = useState(false);
+
+  const { isConnected, connectionState, messages, members, sendMessage } = useWebSocket(
+    room?.id ?? ""
+  );
+  const isOwner = room?.createdBy === user?.id;
+  const running = submitting || (lastSubmission !== null && PENDING_STATUSES.has(lastSubmission.status));
+
+  useEffect(() => {
+    setLoading(true);
+    roomApi
+      .getRoom(roomId)
+      .then(setRoom)
+      .catch(() => setRoom(null))
+      .finally(() => setLoading(false));
   }, [roomId]);
 
-  // Fetch problem when room has one assigned
   useEffect(() => {
-    if (!roomData?.currentProblemId) {
-      setCurrentProblem(null);
+    if (!room?.currentProblemId) {
+      setProblem(null);
       return;
     }
-    problemApi
-      .getProblem(roomData.currentProblemId)
-      .then(setCurrentProblem)
-      .catch(() => setCurrentProblem(null));
-  }, [roomData?.currentProblemId]);
-
-  const openProblemPicker = async () => {
-    setShowProblemPicker(true);
-    if (availableProblems.length > 0) return;
-    try {
-      setLoadingProblems(true);
-      const data = await problemApi.getAllProblems();
-      setAvailableProblems(data);
-    } catch (err) {
-      console.error("Failed to load problems:", err);
-    } finally {
-      setLoadingProblems(false);
-    }
-  };
-
-  const assignProblem = async (problem: Problem) => {
-    if (!roomId) return;
-    try {
-      const updated = await roomApi.setRoomProblem(roomId, problem.id);
-      setRoomData(updated);
-      setShowProblemPicker(false);
-    } catch (err) {
-      console.error("Failed to assign problem:", err);
-    }
-  };
+    problemApi.getProblem(room.currentProblemId).then(setProblem).catch(() => setProblem(null));
+  }, [room?.currentProblemId]);
 
   // The runner writes the verdict to the row; the room finds out by asking.
   useEffect(() => {
@@ -235,328 +229,147 @@ const RoomView = () => {
     return () => clearInterval(timer);
   }, [lastSubmission]);
 
-  const runCode = async () => {
-    if (!roomId || !user || !currentProblem) return;
+  const pickProblem = async (chosen: Problem) => {
     try {
-      setIsSubmitting(true);
-      const submission = await submissionApi.submit({
-        roomId,
-        problemId: currentProblem.id,
-        language,
-        code,
-      });
-      setLastSubmission(submission);
+      setRoom(await roomApi.setRoomProblem(roomId, chosen.id));
+      setPicking(false);
     } catch (err) {
-      console.error("Submission failed:", err);
-    } finally {
-      setIsSubmitting(false);
+      console.error("Failed to assign problem:", err);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <Header />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 text-center">
-            Loading room...
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
+  const run = async () => {
+    if (!problem) return;
+    setSubmitting(true);
+    try {
+      setLastSubmission(
+        await submissionApi.submit({ roomId, problemId: problem.id, language: "python", code })
+      );
+    } catch (err) {
+      console.error("Submission failed:", err);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
-  if (roomError || !roomData) {
+  if (loading) return <p className={`${muted} text-sm`}>Loading room...</p>;
+
+  if (!room) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <Header />
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8 text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Room unavailable
-            </h1>
-            <p className="text-gray-600 mb-6">
-              {roomError ?? "This room could not be loaded."}
-            </p>
-            <Link
-              to="/rooms"
-              className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
-            >
-              Back to rooms
-            </Link>
-          </div>
-        </div>
-        <Footer />
+      <div className={`${card} mx-auto max-w-md p-8 text-center`}>
+        <h1 className="text-lg font-semibold">Room unavailable</h1>
+        <p className={`${muted} mt-1 mb-6 text-sm`}>It may have closed, or the link is wrong.</p>
+        <Link to="/rooms" className={button.primary}>
+          Back to rooms
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <Header />
-
-      {/* Status Bar */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-12">
-            <nav className="flex items-center space-x-6">
-              <Link
-                to="/rooms"
-                className="text-gray-600 hover:text-gray-900 flex items-center"
-              >
-                <svg
-                  className="w-4 h-4 mr-1"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-                Rooms
-              </Link>
-              <span className="text-gray-300">|</span>
-              <span className="text-gray-900 font-medium">{roomData?.name}</span>
-            </nav>
-            <div className="flex items-center space-x-2 text-sm">
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  isConnected ? "bg-green-500" : "bg-red-500"
-                }`}
-              />
-              <span className="text-gray-600">
-                {isConnected ? "Connected" : "Connecting..."}
-              </span>
-            </div>
-          </div>
+    <>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">{room.name}</h1>
+          <p className={`${muted} mt-1 text-sm`}>
+            {room.description ? `${room.description} · ` : ""}
+            opened by {room.createdByName ?? "someone"}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`${muted} mr-2 flex items-center gap-1.5 text-xs`}>
+            <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-500" : "bg-amber-500"}`} />
+            {isConnected ? "Live" : "Connecting"}
+          </span>
+          <InviteButton roomId={roomId} />
+          <LeaveRoomButton roomId={roomId} />
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Room Info Banner */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 mb-8">
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                {roomData?.name}
-              </h1>
-              <p className="text-gray-600 mb-4">{roomData?.description}</p>
-              <div className="flex items-center space-x-6 text-sm text-gray-500">
-                <span>Created by {roomData?.createdBy}</span>
-                <span>•</span>
-                <span>Room ID: {roomId}</span>
-              </div>
-            </div>
-            <div className="flex items-center space-x-3">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <section className={`${card} overflow-hidden`}>
+            <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
+              <span className={`${muted} text-xs`}>Python 3.11</span>
               <button
-                onClick={() => navigator.clipboard.writeText(roomId || "")}
-                className="bg-blue-50 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200 text-sm"
+                type="button"
+                onClick={run}
+                disabled={running || !problem}
+                title={problem ? "" : "Choose a problem first"}
+                className={button.primary}
               >
-                Copy room ID
+                {running ? "Running..." : "Run tests"}
               </button>
-              <LeaveRoomButton roomId={roomId || ""} />
             </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Code Editor */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  Code editor
-                </h2>
-                <div className="flex items-center space-x-2">
-                  <select
-                    value={language}
-                    onChange={(e) => setLanguage(e.target.value)}
-                    className="text-sm border border-gray-300 rounded px-3 py-1"
-                  >
-                    <option value="python">Python</option>
-                  </select>
-                  <button
-                    onClick={runCode}
-                    disabled={
-                      isSubmitting ||
-                      !currentProblem ||
-                      !user ||
-                      (lastSubmission !== null &&
-                        PENDING_STATUSES.has(lastSubmission.status))
-                    }
-                    title={
-                      !currentProblem
-                        ? "Assign a problem first"
-                        : !user
-                        ? "Sign in to submit"
-                        : ""
-                    }
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSubmitting ||
-                    (lastSubmission &&
-                      PENDING_STATUSES.has(lastSubmission.status))
-                      ? "Running..."
-                      : "Run code"}
-                  </button>
-                </div>
-              </div>
-
-              <CollaborativeEditor
-                roomId={roomId || ""}
-                language={language}
-                starterCode={currentProblem?.starterCode}
-                onCodeChange={setCode}
-              />
-
-              {lastSubmission && <VerdictPanel submission={lastSubmission} />}
-            </div>
-
-            {/* Problem Statement */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">
-                  {currentProblem ? (
-                    <span className="flex items-center gap-2">
-                      Problem: {currentProblem.title}
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs font-medium border capitalize ${
-                          DIFFICULTY_COLORS[currentProblem.difficulty] ??
-                          "text-gray-600 bg-gray-50 border-gray-200"
-                        }`}
-                      >
-                        {currentProblem.difficulty}
-                      </span>
-                    </span>
-                  ) : (
-                    "No problem assigned"
-                  )}
-                </h2>
-                {isRoomCreator && (
-                  <button
-                    onClick={openProblemPicker}
-                    className="text-sm text-indigo-600 hover:text-indigo-800 font-medium border border-indigo-200 px-3 py-1 rounded-lg hover:bg-indigo-50 transition-colors"
-                  >
-                    {currentProblem ? "Change problem" : "Assign problem"}
-                  </button>
-                )}
-              </div>
-
-              {currentProblem ? (
-                <div className="space-y-4 text-sm">
-                  <p className="text-gray-800 whitespace-pre-line">
-                    {currentProblem.statement ??
-                      "This problem has no statement yet."}
-                  </p>
-                  {currentProblem.samples.map((sample, index) => (
-                    <div key={index} className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-gray-500 mb-1">
-                          Sample input {index + 1}
-                        </p>
-                        <pre className="bg-gray-50 border border-gray-200 rounded p-2 whitespace-pre-wrap">
-                          {sample.input}
-                        </pre>
-                      </div>
-                      <div>
-                        <p className="text-gray-500 mb-1">Expected output</p>
-                        <pre className="bg-gray-50 border border-gray-200 rounded p-2 whitespace-pre-wrap">
-                          {sample.expected}
-                        </pre>
-                      </div>
-                    </div>
-                  ))}
-                  <p className="text-gray-600">
-                    Time limit: {currentProblem.timeLimitMs}ms · Memory:{" "}
-                    {currentProblem.memLimitMb}MB
-                  </p>
-                </div>
-              ) : (
-                <p className="text-gray-500 text-sm">
-                  {isRoomCreator
-                    ? "Assign a problem to get started."
-                    : "Waiting for the room creator to assign a problem."}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column */}
-          <div className="space-y-6">
-            <RoomMembersPanel
-              members={members}
-              connectionState={connectionState}
+            <CollaborativeEditor
+              roomId={roomId}
+              starterCode={problem?.starterCode}
+              onCodeChange={setCode}
             />
-            <div className="h-96">
-              <RoomChatComponent
-                roomId={roomId}
-                isConnected={isConnected}
-                messages={messages}
-                sendMessage={sendMessage}
-              />
+            {lastSubmission && <VerdictPanel submission={lastSubmission} />}
+          </section>
+
+          <section className={`${card} p-5`}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="flex items-center gap-2 font-semibold">
+                {problem ? problem.title : "No problem chosen"}
+                {problem && <span className={badge(difficulty[problem.difficulty])}>{problem.difficulty}</span>}
+              </h2>
+              {isOwner && (
+                <button type="button" onClick={() => setPicking(true)} className={button.secondary}>
+                  {problem ? "Change" : "Choose a problem"}
+                </button>
+              )}
             </div>
-          </div>
+
+            {!problem && (
+              <p className={`${muted} text-sm`}>
+                {isOwner ? "Choose a problem to get started." : "Waiting for the room owner to choose a problem."}
+              </p>
+            )}
+
+            {problem && (
+              <div className="space-y-4 text-sm">
+                <p className="whitespace-pre-line">
+                  {problem.statement ?? "This problem has no statement or tests yet."}
+                </p>
+                {problem.samples.map((sample, index) => (
+                  <div key={index} className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <p className={`${muted} mb-1 text-xs`}>Sample input {index + 1}</p>
+                      <pre className={pre}>{sample.input}</pre>
+                    </div>
+                    <div>
+                      <p className={`${muted} mb-1 text-xs`}>Expected output</p>
+                      <pre className={pre}>{sample.expected}</pre>
+                    </div>
+                  </div>
+                ))}
+                <p className={`${muted} text-xs`}>
+                  Time limit {problem.timeLimitMs} ms · memory {problem.memLimitMb} MB
+                </p>
+              </div>
+            )}
+          </section>
+        </div>
+
+        <div className="space-y-6">
+          <RoomMembersPanel members={members} connectionState={connectionState} />
+          <RoomChatComponent isConnected={isConnected} messages={messages} sendMessage={sendMessage} />
         </div>
       </div>
 
-      {/* Problem Picker Modal */}
-      {showProblemPicker && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[70vh] flex flex-col">
-            <div className="flex items-center justify-between p-6 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Assign a problem
-              </h3>
-              <button
-                onClick={() => setShowProblemPicker(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                Close
-              </button>
-            </div>
-            <div className="overflow-y-auto flex-1">
-              {loadingProblems && (
-                <div className="p-6 text-center text-gray-500">
-                  Loading problems...
-                </div>
-              )}
-              {!loadingProblems && availableProblems.length === 0 && (
-                <div className="p-6 text-center text-gray-500">
-                  No problems available. Add some via the API.
-                </div>
-              )}
-              {availableProblems.map((problem) => (
-                <button
-                  key={problem.id}
-                  onClick={() => assignProblem(problem)}
-                  className="w-full text-left px-6 py-4 hover:bg-gray-50 border-b border-gray-100 flex items-center justify-between transition-colors"
-                >
-                  <span className="font-medium text-gray-900">
-                    {problem.title}
-                  </span>
-                  <span
-                    className={`px-2 py-0.5 rounded-full text-xs font-medium border capitalize ${
-                      DIFFICULTY_COLORS[problem.difficulty] ??
-                      "text-gray-600 bg-gray-50 border-gray-200"
-                    }`}
-                  >
-                    {problem.difficulty}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+      {picking && <ProblemPicker onPick={pickProblem} onClose={() => setPicking(false)} />}
+    </>
+  );
+};
 
-      <Footer />
-    </div>
+const RoomView = () => {
+  const { roomId } = useParams();
+  return (
+    <Layout wide>
+      <RequireSignIn>{roomId && <Room roomId={roomId} />}</RequireSignIn>
+    </Layout>
   );
 };
 
