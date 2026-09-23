@@ -12,6 +12,7 @@ import RoomView from "./routes/rooms/RoomView.tsx";
 import CreateRoom from "./routes/rooms/CreateRoom.tsx";
 import Replay from "./routes/rooms/Replay.tsx";
 import Problems from "./routes/Problems.tsx";
+import About from "./routes/About.tsx";
 import { ClerkAuthBridge } from "./lib/auth.ts";
 import { UserBootstrap } from "./lib/UserBootstrap.tsx";
 import { initTheme } from "./lib/theme.ts";
@@ -33,6 +34,7 @@ const router = createBrowserRouter([
   { path: "/rooms/:roomId/replay", element: <Replay /> },
   { path: "/rooms/join", element: <JoinRoom /> },
   { path: "/problems", element: <Problems /> },
+  { path: "/about", element: <About /> },
 ]);
 
 createRoot(document.getElementById("root")!).render(
