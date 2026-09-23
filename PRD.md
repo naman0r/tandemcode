@@ -6,7 +6,7 @@
 
 ---
 
-## 🎯 MVP Vision (What we're building)
+## MVP Vision (What we're building)
 
 A web platform where **2 people can**:
 
@@ -20,9 +20,9 @@ A web platform where **2 people can**:
 
 ---
 
-## 📚 Learning Path (Week by Week)
+## Learning Path (Week by Week)
 
-### **Week 1: Spring Boot Foundations** ✅ COMPLETED
+### **Week 1: Spring Boot Foundations** COMPLETED
 
 **Goal**: Get comfortable with Spring Boot basics  
 **What you'll learn**: REST APIs, dependencies, application properties, database connections
@@ -156,7 +156,7 @@ A web platform where **2 people can**:
 
 ---
 
-## 🛠️ Technical Architecture (For your reference)
+## Technical Architecture (For your reference)
 
 ```
 ┌─────────────────┐    WebSocket     ┌──────────────────┐
@@ -185,27 +185,27 @@ A web platform where **2 people can**:
 
 ---
 
-## 🎓 Learning Philosophy
+## Learning Philosophy
 
 **I will provide**:
 
-- ✅ Clear explanations of concepts before each week
-- ✅ Code examples and templates to get you started
-- ✅ Troubleshooting help when you're stuck
-- ✅ Architecture guidance and best practices
+- Clear explanations of concepts before each week
+- Code examples and templates to get you started
+- Troubleshooting help when you're stuck
+- Architecture guidance and best practices
 
 **You will code**:
 
-- ✅ All the actual implementation
-- ✅ Entity classes, controllers, and business logic
-- ✅ Frontend integration and user experience
-- ✅ Problem-solving and debugging
+- All the actual implementation
+- Entity classes, controllers, and business logic
+- Frontend integration and user experience
+- Problem-solving and debugging
 
 **Goal**: By week 8, you'll understand Spring Boot, AWS basics, WebSockets, and have built a unique platform!
 
 ---
 
-## 📋 Next Steps
+## Next Steps
 
 1. **This week (Week 2)**: Focus on database entities and repositories
 2. **I'll provide**: Entity templates and SQL scripts to get you started
