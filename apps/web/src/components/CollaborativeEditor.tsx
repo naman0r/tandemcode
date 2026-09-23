@@ -53,11 +53,14 @@ const CollaborativeEditor = ({
   // The relay keeps no document, so a room's text lives only in its peers. The
   // starter code goes in when the shared text is empty after sync, which is
   // the first person to arrive with a problem assigned. Any later arrival
-  // syncs their text instead and leaves it alone.
+  // syncs their text instead and leaves it alone. Once per document: a
+  // reconnect after someone cleared the editor must not put it back.
+  const seededRef = useRef(false);
   const seedStarterCode = (ydoc: Y.Doc) => {
     const starter = starterCodeRef.current;
     const ytext = ydoc.getText("code");
-    if (starter && ytext.length === 0) {
+    if (starter && !seededRef.current && ytext.length === 0) {
+      seededRef.current = true;
       ytext.insert(0, starter);
     }
   };
@@ -94,6 +97,7 @@ const CollaborativeEditor = ({
 
     const ydoc = new Y.Doc();
     ydocRef.current = ydoc;
+    seededRef.current = false;
 
     let cancelled = false;
     let refresh: ReturnType<typeof setInterval> | undefined;

@@ -27,7 +27,7 @@ $$,
     {"input": "3 2 4\n6\n", "expected": "1 2", "hidden": false},
     {"input": "3 3\n6\n", "expected": "0 1", "hidden": true},
     {"input": "-1 -2 -3 -4 -5\n-8\n", "expected": "2 4", "hidden": true},
-    {"input": "1 5 9 2 8 3 7\n10\n", "expected": "0 2", "hidden": true}
+    {"input": "1 4 9 2 11 3\n10\n", "expected": "0 2", "hidden": true}
   ]$$::jsonb
 WHERE slug = 'two-sum';
 
