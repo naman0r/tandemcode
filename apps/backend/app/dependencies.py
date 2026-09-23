@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 import asyncpg
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -17,6 +19,8 @@ from app.services.rooms import RoomService
 from app.services.submissions import SubmissionService
 from app.services.users import UserService
 
+
+logger = logging.getLogger(__name__)
 
 # auto_error=False so a missing header lands on our own 401 below rather than
 # FastAPI's bare 403.
@@ -36,9 +40,11 @@ async def current_user_id(
     try:
         return await clerk_user_id(credentials.credentials)
     except TokenError as exc:
+        # The reason can name the JWKS URL or a network error; it is ours to read.
+        logger.info("Rejected token: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(exc),
+            detail="Invalid or expired token",
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 

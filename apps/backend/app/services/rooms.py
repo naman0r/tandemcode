@@ -13,6 +13,11 @@ from app.dao.rooms import RoomDAO
 from app.dao.submissions import SubmissionDAO
 from app.dao.users import UserDAO
 
+# Enough for anyone opening rooms by hand; a script hits it in seconds.
+ROOMS_PER_HOUR = 10
+# The newest open rooms. Past this the list is not browsable anyway.
+ROOM_LIST_LIMIT = 100
+
 
 async def get_active_room(room_dao: RoomDAO, room_id: str) -> dict:
     """The room, if it exists and is still open.
@@ -82,6 +87,12 @@ class RoomService:
                 detail=f"User not found: {created_by}",
             )
 
+        if await self.room_dao.count_created_since(created_by, 3600) >= ROOMS_PER_HOUR:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many new rooms. Try again later.",
+            )
+
         room_id = str(uuid4())
         return await self.room_dao.create(room_id, name, description, created_by)
 
@@ -89,7 +100,7 @@ class RoomService:
         return await get_active_room(self.room_dao, room_id)
 
     async def list_active_rooms(self) -> list[dict]:
-        return await self.room_dao.list_active()
+        return await self.room_dao.list_active(ROOM_LIST_LIMIT)
 
     async def list_rooms_by_creator(self, user_id: str) -> list[dict]:
         return await self.room_dao.list_active_by_creator(user_id)
@@ -136,15 +147,16 @@ class RoomService:
         return updated_room
 
     async def leave_room(self, room_id: str, user_id: str) -> dict:
-        """Walk out, closing the room behind you if you were the last one in it.
+        """Walk out. The owner walking out of an empty room closes it.
 
-        Closing is `is_active = false`, not a DELETE: submissions and events
-        reference the room and are the raw material for the session history we
-        want to show people later.
+        Only the owner, or anyone could close an idle room by joining it and
+        leaving. Closing is `is_active = false`, not a DELETE: submissions and
+        events reference the room and are the raw material for the session
+        history we want to show people later.
         """
-        await get_active_room(self.room_dao, room_id)
+        room = await get_active_room(self.room_dao, room_id)
         removal = await self.room_member_dao.remove_member(
-            room_id, user_id, close_if_empty=True
+            room_id, user_id, close_if_empty=room["createdBy"] == user_id
         )
         if not removal.removed:
             raise HTTPException(

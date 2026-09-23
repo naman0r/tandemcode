@@ -123,3 +123,42 @@ def test_the_whole_room_hears_the_run_start_and_the_verdict(client, room):
         listed = client.get(f"/api/submissions/room/{room['id']}", headers=auth("user_alice")).json()
         assert "T" in judged["createdAt"]
         assert datetime.fromisoformat(judged["createdAt"]) == datetime.fromisoformat(listed[0]["createdAt"])
+
+
+def test_one_run_in_flight_per_person_across_rooms(client, room):
+    assert submit(client, room, TWO_SUM).status_code == 200
+    other = client.post("/api/rooms", json={"name": "Other"}, headers=auth("user_alice")).json()
+    assert submit(client, other, TWO_SUM).status_code == 429
+
+
+def test_a_verdict_that_cannot_be_stored_still_finishes_the_run(client, room, monkeypatch):
+    """Left running, the row would be requeued and fail the same way forever."""
+    submission = submit(client, room, TWO_SUM).json()
+    real_complete = SubmissionDAO.complete
+    calls = []
+
+    async def complete_once_failing(self, submission_id, status, time_ms, result):
+        calls.append(status)
+        if len(calls) == 1:
+            raise ValueError("unstorable")
+        await real_complete(self, submission_id, status, time_ms, result)
+
+    monkeypatch.setattr(SubmissionDAO, "complete", complete_once_failing)
+    drain_queue(client)
+
+    judged = client.get(f"/api/submissions/{submission['id']}", headers=auth("user_alice")).json()
+    assert judged["status"] == "runtime_error"
+    assert judged["result"]["tests"] == []
+
+
+def test_runner_will_not_judge_in_process_unless_told(monkeypatch):
+    import asyncio
+
+    import pytest
+
+    from app.runner import __main__ as runner
+
+    monkeypatch.setattr(runner, "SANDBOX_IMAGE", None)
+    monkeypatch.setattr(runner, "ALLOW_UNSANDBOXED", False)
+    with pytest.raises(SystemExit):
+        asyncio.run(runner.main())

@@ -64,14 +64,26 @@ def _limits(mem_limit_mb: int):
 
 
 def _clip(text: bytes) -> str:
-    decoded = text.decode("utf-8", errors="replace")
+    # Postgres rejects NUL in jsonb, and a verdict that cannot be stored
+    # would put the runner in a crash loop on the same row.
+    decoded = text.decode("utf-8", errors="replace").replace("\x00", "")
     if len(decoded) > OUTPUT_LIMIT:
         return decoded[:OUTPUT_LIMIT] + "\n[output truncated]"
     return decoded
 
 
+def _outcome(index: int, test: dict, passed: bool, elapsed: int, stdout: bytes, stderr: bytes) -> TestOutcome:
+    hidden = bool(test.get("hidden"))
+    # A failing hidden test's output can echo its stdin, which is the test.
+    if hidden:
+        return TestOutcome(index, True, passed, elapsed, "", "")
+    return TestOutcome(index, False, passed, elapsed, _clip(stdout), _clip(stderr))
+
+
 def judge(code: str, tests: list[dict], time_limit_ms: int, mem_limit_mb: int) -> Verdict:
-    verdict = Verdict(status=ACCEPTED, timeMs=0, passed=0, total=len(tests))
+    # A problem with no tests would otherwise accept anything.
+    status = ACCEPTED if tests else RUNTIME_ERROR
+    verdict = Verdict(status=status, timeMs=0, passed=0, total=len(tests))
     with tempfile.TemporaryDirectory() as workdir:
         program = Path(workdir) / "main.py"
         program.write_text(code)
@@ -91,8 +103,7 @@ def judge(code: str, tests: list[dict], time_limit_ms: int, mem_limit_mb: int) -
             except subprocess.TimeoutExpired as exc:
                 elapsed = int((time.perf_counter() - started) * 1000)
                 verdict.tests.append(
-                    TestOutcome(index, bool(test.get("hidden")), False, elapsed,
-                                _clip(exc.stdout or b""), _clip(exc.stderr or b""))
+                    _outcome(index, test, False, elapsed, exc.stdout or b"", exc.stderr or b"")
                 )
                 verdict.status = TIME_LIMIT_EXCEEDED
                 break
@@ -105,8 +116,7 @@ def judge(code: str, tests: list[dict], time_limit_ms: int, mem_limit_mb: int) -
                 == test["expected"].strip()
             )
             verdict.tests.append(
-                TestOutcome(index, bool(test.get("hidden")), passed, elapsed,
-                            _clip(completed.stdout), _clip(completed.stderr))
+                _outcome(index, test, passed, elapsed, completed.stdout, completed.stderr)
             )
             if passed:
                 verdict.passed += 1

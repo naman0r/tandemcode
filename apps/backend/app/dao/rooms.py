@@ -43,10 +43,10 @@ class RoomDAO:
             row = await conn.fetchrow(query, room_id)
         return _map_room(row) if row else None
 
-    async def list_active(self) -> list[dict]:
-        query = f"{SELECT_ROOM} WHERE r.is_active = TRUE ORDER BY r.created_at DESC"
+    async def list_active(self, limit: int) -> list[dict]:
+        query = f"{SELECT_ROOM} WHERE r.is_active = TRUE ORDER BY r.created_at DESC LIMIT $1"
         async with self.pool.acquire() as conn:
-            rows = await conn.fetch(query)
+            rows = await conn.fetch(query, limit)
         return [_map_room(row) for row in rows]
 
     async def list_active_by_creator(self, user_id: str) -> list[dict]:
@@ -68,6 +68,14 @@ class RoomDAO:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(query, user_id, active)
         return [_map_room(row) for row in rows]
+
+    async def count_created_since(self, user_id: str, seconds: int) -> int:
+        query = """
+            SELECT COUNT(*) FROM rooms
+            WHERE created_by = $1 AND created_at > NOW() - make_interval(secs => $2)
+        """
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval(query, user_id, seconds)
 
     async def exists(self, room_id: str) -> bool:
         query = "SELECT EXISTS(SELECT 1 FROM rooms WHERE id = $1)"

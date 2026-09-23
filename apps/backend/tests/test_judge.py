@@ -21,6 +21,22 @@ def run(code: str, time_limit_ms: int = 2000, mem_limit_mb: int = 256):
     return judge(code, TESTS, time_limit_ms, mem_limit_mb)
 
 
+def test_hidden_test_output_is_never_returned():
+    # Echoing stdin fails the test and would otherwise print the hidden input.
+    verdict = judge("import sys\nprint(sys.stdin.read())\n", [TESTS[1]], 2000, 256)
+    assert verdict.status == WRONG_ANSWER
+    assert (verdict.tests[0].stdout, verdict.tests[0].stderr) == ("", "")
+
+
+def test_nul_bytes_are_dropped_from_output():
+    verdict = judge("print('a\\x00b')\n", [TESTS[0]], 2000, 256)
+    assert verdict.tests[0].stdout == "ab\n"
+
+
+def test_a_problem_with_no_tests_accepts_nothing():
+    assert judge(ADD, [], 2000, 256).status == RUNTIME_ERROR
+
+
 def test_correct_program_passes_every_test():
     verdict = run(ADD)
     assert verdict.status == ACCEPTED

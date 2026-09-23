@@ -42,13 +42,3 @@ class UserDAO:
         query = "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)"
         async with self.pool.acquire() as conn:
             return bool(await conn.fetchval(query, user_id))
-
-    async def list_all(self) -> list[dict]:
-        query = """
-            SELECT id, email, name, created_at
-            FROM users
-            ORDER BY created_at ASC
-        """
-        async with self.pool.acquire() as conn:
-            rows = await conn.fetch(query)
-        return [_map_user(row) for row in rows]

@@ -33,16 +33,18 @@ const colorFor = (id: string): string => {
 
 // y-monaco tags each remote selection with the peer's Yjs client id and
 // leaves the colouring to us. One stylesheet, rewritten whenever the set of
-// peers or their names change.
+// peers or their names change. Awareness state is whatever the peer sent, so
+// the colour is picked here and the name is escaped before it enters CSS.
 const cursorStyles = (awareness: WebsocketProvider["awareness"]): string => {
   const rules: string[] = [];
   awareness.getStates().forEach((state, clientId) => {
     if (clientId === awareness.clientID || !state.user) return;
-    const { name, color } = state.user as { name: string; color: string };
+    const name = CSS.escape(String((state.user as { name?: unknown }).name ?? ""));
+    const color = colorFor(String(clientId));
     rules.push(
       `.yRemoteSelection-${clientId} { background-color: ${color}33; }`,
       `.yRemoteSelectionHead-${clientId} { position: relative; border-left: 2px solid ${color}; }`,
-      `.yRemoteSelectionHead-${clientId}::after { content: "${name.replace(/"/g, "")}"; position: absolute; top: -1.3em; left: -2px; padding: 0 4px; border-radius: 3px; font-size: 11px; line-height: 1.3em; color: white; background-color: ${color}; white-space: nowrap; pointer-events: none; }`,
+      `.yRemoteSelectionHead-${clientId}::after { content: "${name}"; position: absolute; top: -1.3em; left: -2px; padding: 0 4px; border-radius: 3px; font-size: 11px; line-height: 1.3em; color: white; background-color: ${color}; white-space: nowrap; pointer-events: none; }`,
     );
   });
   return rules.join("\n");
@@ -144,10 +146,7 @@ const CollaborativeEditor = ({
       provider.on("sync", (synced: boolean) => {
         if (synced) seedStarterCode(ydoc);
       });
-      provider.awareness.setLocalStateField("user", {
-        name: userRef.current.name,
-        color: colorFor(userRef.current.id),
-      });
+      provider.awareness.setLocalStateField("user", { name: userRef.current.name });
       provider.awareness.on("change", () =>
         setPeerStyles(cursorStyles(provider.awareness)),
       );

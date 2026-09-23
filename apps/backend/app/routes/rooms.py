@@ -83,6 +83,13 @@ async def leave_room(
     await request.app.state.room_chat_manager.close_user(
         room_id, caller_id, RoomMemberDAO(request.app.state.db_pool)
     )
+    yjs = request.app.state.yjs_relay_manager
+    # An editor socket can outlive its room socket after a dropped connection,
+    # so a closing room shuts every one of them, not only the leaver's.
+    if result["roomClosed"]:
+        await yjs.close_room(room_id)
+    else:
+        await yjs.close_user(room_id, caller_id)
     return LeaveRoomResponse.model_validate(result)
 
 

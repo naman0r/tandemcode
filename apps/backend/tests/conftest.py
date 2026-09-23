@@ -51,6 +51,19 @@ def clerk_profiles(monkeypatch):
     monkeypatch.setattr("app.services.users.fetch_profile", fetch_profile)
 
 
+async def _settle_runs(pool) -> None:
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE submissions SET status = 'runtime_error' WHERE status IN ('pending', 'running')"
+        )
+
+
+@pytest.fixture(autouse=True)
+def room_rate(monkeypatch):
+    """Every test's room is Alice's, far past the hourly limit in one session."""
+    monkeypatch.setattr("app.services.rooms.ROOMS_PER_HOUR", 10_000)
+
+
 @pytest.fixture
 def client():
     from fastapi.testclient import TestClient
@@ -59,6 +72,9 @@ def client():
 
     with TestClient(app) as test_client:
         yield test_client
+        # One run in flight per person holds across rooms, so a run one test
+        # leaves pending would refuse the next test's.
+        test_client.portal.call(_settle_runs, test_client.app.state.db_pool)
 
 
 @pytest.fixture
