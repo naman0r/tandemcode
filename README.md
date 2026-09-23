@@ -102,5 +102,4 @@ runner can call the same thing.
 
 ## Contributing
 
-Every pull request closes an issue. `AGENTS.md` has the rules for agents and
-the same checks as above.
+`AGENTS.md` has the rules for agents and the same checks as above.
