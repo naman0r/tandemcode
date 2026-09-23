@@ -8,6 +8,10 @@ from app.dao.submissions import SubmissionDAO
 from app.dao.users import UserDAO
 from app.services.rooms import get_active_room
 
+# The runner executes with the Python interpreter it ships with. Other
+# languages need their own image and are a later ticket.
+SUPPORTED_LANGUAGES = {"python"}
+
 
 class SubmissionService:
     def __init__(
@@ -30,6 +34,11 @@ class SubmissionService:
         language: str,
         code: str,
     ) -> dict:
+        if language not in SUPPORTED_LANGUAGES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unsupported language: {language}",
+            )
         await get_active_room(self.room_dao, room_id)
 
         problem_exists = await self.problem_dao.exists(problem_id)
