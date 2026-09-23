@@ -29,11 +29,13 @@ def two_sum(client) -> dict:
 
 
 def submit(client, room, code: str, language: str = "python"):
-    return client.post(
-        "/api/submissions",
-        json={"roomId": room["id"], "problemId": two_sum(client)["id"], "language": language, "code": code},
-        headers=auth("user_alice"),
-    )
+    """Submit as Alice, from inside the room as the app does."""
+    with room_socket(client, room["id"], "user_alice"):
+        return client.post(
+            "/api/submissions",
+            json={"roomId": room["id"], "problemId": two_sum(client)["id"], "language": language, "code": code},
+            headers=auth("user_alice"),
+        )
 
 
 def drain_queue(client) -> int:
@@ -162,3 +164,53 @@ def test_runner_will_not_judge_in_process_unless_told(monkeypatch):
     monkeypatch.setattr(runner, "ALLOW_UNSANDBOXED", False)
     with pytest.raises(SystemExit):
         asyncio.run(runner.main())
+
+
+def test_only_people_in_the_room_can_run_code_in_it(client, room):
+    response = client.post(
+        "/api/submissions",
+        json={"roomId": room["id"], "problemId": two_sum(client)["id"], "language": "python", "code": TWO_SUM},
+        headers=auth("user_alice"),
+    )
+    assert response.status_code == 403
+
+
+def test_runs_per_hour_are_capped(client, room, signed_up, monkeypatch):
+    monkeypatch.setattr("app.services.submissions.RUNS_PER_HOUR", 1)
+    signed_up("user_frank")
+    body = {"roomId": room["id"], "problemId": two_sum(client)["id"], "language": "python", "code": TWO_SUM}
+    with room_socket(client, room["id"], "user_frank"):
+        assert client.post("/api/submissions", json=body, headers=auth("user_frank")).status_code == 200
+        drain_queue(client)
+        assert client.post("/api/submissions", json=body, headers=auth("user_frank")).status_code == 429
+
+
+def test_verdicts_keep_arriving_after_the_listener_connection_drops(client, room):
+    """A database restart ends the LISTEN connection; the API must reconnect."""
+    import time
+
+    async def kill_listener(pool):
+        async with pool.acquire() as conn:
+            return await conn.fetchval(
+                "SELECT COUNT(pg_terminate_backend(pid)) FROM pg_stat_activity WHERE query LIKE 'LISTEN%'"
+            )
+
+    listener = client.app.state.verdict_listener
+    before = listener.conn
+    # An earlier test's app may not have closed its listener yet, so at least one.
+    assert client.portal.call(kill_listener, client.app.state.db_pool) >= 1
+    for _ in range(100):
+        if listener.conn is not before and not listener.conn.is_closed():
+            break
+        time.sleep(0.05)
+    else:
+        raise AssertionError("the verdict listener never reconnected")
+
+    with room_socket(client, room["id"], "user_bob") as bob:
+        roster(bob)
+        submit(client, room, TWO_SUM)
+        drain_queue(client)
+        while (event := next_submission_event(bob))["status"] == "pending":
+            pass
+        assert event["status"] == "accepted"
+

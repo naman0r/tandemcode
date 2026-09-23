@@ -8,6 +8,7 @@ from fastapi import WebSocket, WebSocketException, status
 
 from app.dao.room_members import RoomMemberDAO
 from app.dao.room_updates import RoomUpdateDAO
+from app.websocket.room_chat import MAX_SOCKETS_PER_USER
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,8 @@ class YjsRelayManager:
         # you there; until it has, this is refused and y-websocket retries.
         if not await room_member_dao.is_present(room_id, user_id):
             raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Not in the room")
+        if sum(1 for owner in self.room_sessions.get(room_id, {}).values() if owner == user_id) >= MAX_SOCKETS_PER_USER:
+            raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Too many connections")
         await websocket.accept()
         self.room_sessions[room_id][websocket] = user_id
 

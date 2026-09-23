@@ -28,12 +28,15 @@ command -v runsc > /dev/null || ./infra/install-gvisor.sh
 if [ ! -f infra/.env ]; then
   cp infra/.env.example infra/.env
   sed -i "s/^DB_PASSWORD=$/DB_PASSWORD=$(openssl rand -hex 24)/" infra/.env
+  sed -i "s/^DB_ADMIN_PASSWORD=$/DB_ADMIN_PASSWORD=$(openssl rand -hex 24)/" infra/.env
   chmod 600 infra/.env
   echo "Wrote infra/.env. Fill in CLERK_ISSUER and CLERK_SECRET_KEY, then run ./infra/deploy.sh"
 fi
 
 # Nightly database dump at 03:15, kept for 14 days.
 sudo mkdir -p /var/backups/tandemcode
+# deploy.sh takes a dump as this user before migrating; cron runs as root.
+sudo chown "$USER" /var/backups/tandemcode
 echo "15 3 * * * root $(pwd)/infra/backup.sh" | sudo tee /etc/cron.d/tandemcode-backup > /dev/null
 
 echo "Bootstrap done. Log out and back in once so the docker group applies."

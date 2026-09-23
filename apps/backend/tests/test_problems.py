@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from app.dao.problems import ProblemDAO
 from tests.rig import auth
 
 
@@ -40,3 +41,13 @@ def test_every_problem_is_complete(client, signed_up):
         assert "class Solution" in problem["starterCode"] or "class Codec" in problem["starterCode"], problem["slug"]
         compile(problem["starterCode"], problem["slug"], "exec")
         assert len(problem["samples"]) >= 2, problem["slug"]
+
+
+def test_hidden_tests_come_after_the_examples(client):
+    """Tests run in order in one container, so a hidden test that ran before a
+    visible one could leave its input in /tmp for the visible run to print."""
+    dao = ProblemDAO(client.app.state.db_pool)
+    for problem in client.portal.call(dao.list_all):
+        spec = client.portal.call(dao.get_judge_spec, problem["id"])
+        hidden = [bool(test.get("hidden")) for test in spec["tests"]]
+        assert hidden == sorted(hidden), problem["slug"]

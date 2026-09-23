@@ -60,8 +60,10 @@ async def _settle_runs(pool) -> None:
 
 @pytest.fixture(autouse=True)
 def room_rate(monkeypatch):
-    """Every test's room is Alice's, far past the hourly limit in one session."""
+    """Every test's room and run is Alice's, far past the limits in one session."""
     monkeypatch.setattr("app.services.rooms.ROOMS_PER_HOUR", 10_000)
+    monkeypatch.setattr("app.services.rooms.ROOMS_PER_DAY", 10_000)
+    monkeypatch.setattr("app.services.submissions.RUNS_PER_HOUR", 10_000)
 
 
 @pytest.fixture

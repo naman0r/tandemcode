@@ -14,6 +14,12 @@ SELECT_SUBMISSION = """
     JOIN users u ON u.id = s.user_id
 """
 
+# Lists are the newest runs without their code: a room's history is loaded on
+# every reconnect, and up to 64 KB of code per run adds up fast. One run's
+# code is still there through get_by_id.
+LIST_SUBMISSIONS = SELECT_SUBMISSION.replace("s.code,", "NULL AS code,")
+LIST_LIMIT = 50
+
 # Runners raise this after writing a verdict; the API listens and tells the room.
 JUDGED_CHANNEL = "submission_judged"
 
@@ -65,16 +71,24 @@ class SubmissionDAO:
         return _map_submission(row) if row else None
 
     async def list_by_room(self, room_id: str) -> list[dict]:
-        query = f"{SELECT_SUBMISSION} WHERE s.room_id = $1 ORDER BY s.created_at DESC"
+        query = f"{LIST_SUBMISSIONS} WHERE s.room_id = $1 ORDER BY s.created_at DESC LIMIT {LIST_LIMIT}"
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(query, room_id)
         return [_map_submission(row) for row in rows]
 
     async def list_by_room_and_user(self, room_id: str, user_id: str) -> list[dict]:
-        query = f"{SELECT_SUBMISSION} WHERE s.room_id = $1 AND s.user_id = $2 ORDER BY s.created_at DESC"
+        query = f"{LIST_SUBMISSIONS} WHERE s.room_id = $1 AND s.user_id = $2 ORDER BY s.created_at DESC LIMIT {LIST_LIMIT}"
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(query, room_id, user_id)
         return [_map_submission(row) for row in rows]
+
+    async def count_created_since(self, user_id: str, seconds: int) -> int:
+        query = """
+            SELECT COUNT(*) FROM submissions
+            WHERE user_id = $1 AND created_at > NOW() - make_interval(secs => $2)
+        """
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval(query, user_id, seconds)
 
     async def claim_pending(self) -> dict | None:
         """Move the oldest pending submission to running and return it."""

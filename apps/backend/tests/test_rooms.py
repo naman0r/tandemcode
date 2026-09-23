@@ -110,18 +110,18 @@ def test_a_non_member_cannot_leave(client, room):
 
 def test_leaving_an_empty_room_closes_it_without_losing_data(client, room):
     problem_id = client.get("/api/problems", headers=auth("user_alice")).json()[0]["id"]
-    client.post(
-        "/api/submissions",
-        json={
-            "roomId": room["id"],
-            "problemId": problem_id,
-            "language": "python",
-            "code": "print(1)",
-        },
-        headers=auth("user_alice"),
-    )
 
     with connect(client, room["id"], "user_alice"):
+        client.post(
+            "/api/submissions",
+            json={
+                "roomId": room["id"],
+                "problemId": problem_id,
+                "language": "python",
+                "code": "print(1)",
+            },
+            headers=auth("user_alice"),
+        )
         assert client.post(
             f"/api/rooms/{room['id']}/leave", headers=auth("user_alice")
         ).json() == {"roomClosed": True}
@@ -262,3 +262,23 @@ def test_the_owner_can_unlist_a_room(client, room):
         assert room["id"] not in listed_ids(client)
         # A partial update is refused rather than read as "public".
         assert client.put(url, json={"advertised": False}, headers=auth("user_alice")).status_code == 422
+
+
+def test_one_user_cannot_open_unlimited_sockets(client, room):
+    with connect(client, room["id"], "user_alice"), connect(client, room["id"], "user_alice"):
+        with connect(client, room["id"], "user_alice"):
+            with pytest.raises(WebSocketDisconnect):
+                with connect(client, room["id"], "user_alice"):
+                    pass
+
+
+def test_a_room_stops_taking_chat_at_its_cap(client, room, monkeypatch):
+    monkeypatch.setattr("app.websocket.room_chat.MAX_CHAT_MESSAGES_PER_ROOM", 1)
+    with connect(client, room["id"], "user_alice") as alice:
+        roster(alice)
+        alice.send_json({"type": "chat", "text": "first"})
+        assert next_chat(alice)["text"] == "first"
+        alice.send_json({"type": "chat", "text": "second"})
+    events = client.get(f"/api/rooms/{room['id']}/replay", headers=auth("user_alice")).json()["events"]
+    assert [e["payload"]["text"] for e in events if e["type"] == "chat"] == ["first"]
+

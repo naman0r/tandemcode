@@ -46,7 +46,9 @@ async def room_participant(
     try:
         user_id = await clerk_user_id(token)
     except TokenError as exc:
-        logger.info("Rejected websocket on room %s: %s", room_id, exc)
+        # %r: the room id comes from the URL, and a decoded newline would
+        # otherwise let a caller write a log line of their own.
+        logger.info("Rejected websocket on room %r: %s", room_id, exc)
         raise WebSocketException(
             code=status.WS_1008_POLICY_VIOLATION, reason="Invalid token"
         ) from exc
@@ -65,7 +67,7 @@ async def room_participant(
     try:
         await get_active_room(RoomDAO(pool), room_id)
     except HTTPException as exc:
-        logger.info("Refused %s access to room %s: %s", user_id, room_id, exc.detail)
+        logger.info("Refused %s access to room %r: %s", user_id, room_id, exc.detail)
         raise WebSocketException(
             code=status.WS_1008_POLICY_VIOLATION, reason=exc.detail
         ) from exc

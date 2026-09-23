@@ -49,6 +49,9 @@ def judge_in_container(
         "--tmpfs", "/tmp:rw,size=64m,mode=1777",
         "--user", "65534:65534",
         "--memory", f"{mem_limit_mb + CONTAINER_MEMORY_OVERHEAD_MB}m",
+        # Without this Docker grants as much swap again, and a program
+        # flooding its output would push the host into swap before the kill.
+        "--memory-swap", f"{mem_limit_mb + CONTAINER_MEMORY_OVERHEAD_MB}m",
         "--cpus", "1",
         "--pids-limit", "32",
         "--cap-drop", "ALL",

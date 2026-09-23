@@ -2,16 +2,33 @@
 # Vercel. Run from the repo root:
 #   docker compose -f infra/docker-compose.prod.yml up -d --build
 # Values come from infra/.env (see infra/.env.example).
+
+# Docker keeps container logs forever by default, and one box has one disk.
+x-logging: &logging
+  logging:
+    driver: local
+    options:
+      max-size: 10m
+      max-file: "3"
+
 services:
   db:
+    <<: *logging
     image: postgres:17
     environment:
       POSTGRES_DB: ${DB_NAME:?missing DB_NAME}
-      POSTGRES_USER: ${DB_USER:?missing DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?missing DB_PASSWORD}
-    # No ports: only the API and runner reach it, over the compose network.
+      # The superuser, for maintenance only. The app connects as DB_USER,
+      # which db-init.sh creates as the database's owner but not a superuser,
+      # so no migration or query can reach the server's files or programs.
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?missing DB_ADMIN_PASSWORD}
+      APP_DB_USER: ${DB_USER:?missing DB_USER}
+      APP_DB_PASSWORD: ${DB_PASSWORD:?missing DB_PASSWORD}
+    # No ports, and a network with no route out.
+    networks: [internal]
     volumes:
       - db-data:/var/lib/postgresql/data
+      - ./db-init.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -20,7 +37,19 @@ services:
     restart: unless-stopped
 
   api:
+    <<: *logging
     build: ../apps/backend
+    # Behind Caddy, the only way in: trust its X-Forwarded-For so logs show
+    # the caller, and cap open connections so a flood cannot exhaust the box.
+    command:
+      - uvicorn
+      - app.main:app
+      - --host=0.0.0.0
+      - --port=8080
+      - --ws-max-size=1048576
+      - --forwarded-allow-ips=*
+      - --limit-concurrency=1000
+    networks: [internal, default]
     environment:
       DB_HOST: db
       DB_PORT: 5432
@@ -42,7 +71,10 @@ services:
     restart: unless-stopped
 
   runner:
+    <<: *logging
     build: ../apps/backend
+    # Needs the database and the Docker socket, nothing on the internet.
+    networks: [internal]
     command: ["python", "-m", "app.runner"]
     environment:
       DB_HOST: db
@@ -75,6 +107,7 @@ services:
     restart: unless-stopped
 
   caddy:
+    <<: *logging
     image: caddy:2
     ports:
       - "80:80"
@@ -89,6 +122,10 @@ services:
       api:
         condition: service_healthy
     restart: unless-stopped
+
+networks:
+  internal:
+    internal: true
 
 volumes:
   db-data:
