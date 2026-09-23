@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from fastapi import WebSocket, WebSocketException, status
 
+from app.dao.events import EventDAO
 from app.dao.room_members import RoomMemberDAO
 from app.websocket.auth import Participant
 
@@ -22,8 +23,9 @@ class RoomChatManager:
     that user's last socket for the room has gone.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, events: EventDAO) -> None:
         self.room_sessions: dict[str, dict[WebSocket, Participant]] = defaultdict(dict)
+        self.events = events
 
     async def join(
         self,
@@ -51,6 +53,11 @@ class RoomChatManager:
             )
 
         await websocket.accept()
+
+        # A refresh should not wipe the conversation. History goes to this
+        # socket alone, before presence, so the client sees it as the past.
+        for message in await self.events.recent_chat(room_id):
+            await websocket.send_text(json.dumps(message))
 
         # After accept so the joiner is in the roster it receives.
         await self._broadcast_presence(room_id, room_member_dao)
@@ -103,16 +110,15 @@ class RoomChatManager:
         if not isinstance(text, str) or not text.strip():
             return
 
-        await self.broadcast(
-            room_id,
-            {
-                "type": "chat",
-                "userId": sender.user_id,
-                "username": sender.display_name,
-                "text": text,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            },
-        )
+        message = {
+            "type": "chat",
+            "userId": sender.user_id,
+            "username": sender.display_name,
+            "text": text,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        await self.events.record(room_id, "chat", message)
+        await self.broadcast(room_id, message)
 
     async def close_user(
         self,

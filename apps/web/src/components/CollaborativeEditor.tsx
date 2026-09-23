@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import Editor from "@monaco-editor/react";
 import type { OnMount } from "@monaco-editor/react";
@@ -10,9 +10,43 @@ import { useTheme } from "../lib/theme";
 
 interface Props {
   roomId: string;
+  user: { id: string; name: string };
   starterCode?: string | null;
   onCodeChange: (code: string) => void;
 }
+
+// Distinct enough to tell two people apart and readable on both themes.
+const CURSOR_COLORS = [
+  "#2563eb",
+  "#db2777",
+  "#16a34a",
+  "#d97706",
+  "#7c3aed",
+  "#0891b2",
+];
+
+const colorFor = (id: string): string => {
+  let hash = 0;
+  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return CURSOR_COLORS[hash % CURSOR_COLORS.length];
+};
+
+// y-monaco tags each remote selection with the peer's Yjs client id and
+// leaves the colouring to us. One stylesheet, rewritten whenever the set of
+// peers or their names change.
+const cursorStyles = (awareness: WebsocketProvider["awareness"]): string => {
+  const rules: string[] = [];
+  awareness.getStates().forEach((state, clientId) => {
+    if (clientId === awareness.clientID || !state.user) return;
+    const { name, color } = state.user as { name: string; color: string };
+    rules.push(
+      `.yRemoteSelection-${clientId} { background-color: ${color}33; }`,
+      `.yRemoteSelectionHead-${clientId} { position: relative; border-left: 2px solid ${color}; }`,
+      `.yRemoteSelectionHead-${clientId}::after { content: "${name.replace(/"/g, "")}"; position: absolute; top: -1.3em; left: -2px; padding: 0 4px; border-radius: 3px; font-size: 11px; line-height: 1.3em; color: white; background-color: ${color}; white-space: nowrap; pointer-events: none; }`,
+    );
+  });
+  return rules.join("\n");
+};
 
 const WS_URL = `${WS_BASE_URL}/ws/yjs`;
 
@@ -23,7 +57,12 @@ type MonacoEditor = Parameters<OnMount>[0];
 // dropped connection come back instead of failing the handshake forever.
 const TOKEN_REFRESH_MS = 30_000;
 
-const CollaborativeEditor = ({ roomId, starterCode, onCodeChange }: Props) => {
+const CollaborativeEditor = ({
+  roomId,
+  user,
+  starterCode,
+  onCodeChange,
+}: Props) => {
   const { getToken, isLoaded, isSignedIn, sessionId } = useAuth();
   const { theme } = useTheme();
   // Held in a ref so that a fresh getToken identity from Clerk cannot re-run the
@@ -35,6 +74,10 @@ const CollaborativeEditor = ({ roomId, starterCode, onCodeChange }: Props) => {
   const ydocRef = useRef<Y.Doc | null>(null);
   const providerRef = useRef<WebsocketProvider | null>(null);
   const bindingRef = useRef<MonacoBinding | null>(null);
+  const [peerStyles, setPeerStyles] = useState("");
+  // Same reason as getTokenRef: a new user object must not rebuild the document.
+  const userRef = useRef(user);
+  userRef.current = user;
   const starterCodeRef = useRef(starterCode);
   starterCodeRef.current = starterCode;
 
@@ -62,7 +105,7 @@ const CollaborativeEditor = ({ roomId, starterCode, onCodeChange }: Props) => {
   const createBinding = (
     ydoc: Y.Doc,
     provider: WebsocketProvider,
-    editor: MonacoEditor
+    editor: MonacoEditor,
   ) => {
     bindingRef.current?.destroy();
     const ytext = ydoc.getText("code");
@@ -70,7 +113,7 @@ const CollaborativeEditor = ({ roomId, starterCode, onCodeChange }: Props) => {
       ytext,
       editor.getModel()!,
       new Set([editor]),
-      provider.awareness
+      provider.awareness,
     );
     bindingRef.current = binding;
   };
@@ -101,6 +144,13 @@ const CollaborativeEditor = ({ roomId, starterCode, onCodeChange }: Props) => {
       provider.on("sync", (synced: boolean) => {
         if (synced) seedStarterCode(ydoc);
       });
+      provider.awareness.setLocalStateField("user", {
+        name: userRef.current.name,
+        color: colorFor(userRef.current.id),
+      });
+      provider.awareness.on("change", () =>
+        setPeerStyles(cursorStyles(provider.awareness)),
+      );
 
       refresh = setInterval(async () => {
         const next = await getTokenRef.current();
@@ -148,22 +198,25 @@ const CollaborativeEditor = ({ roomId, starterCode, onCodeChange }: Props) => {
   };
 
   return (
-    <Editor
-      height="420px"
-      defaultLanguage="python"
-      theme={theme === "dark" ? "vs-dark" : "light"}
-      onMount={handleMount}
-      options={{
-        minimap: { enabled: false },
-        fontSize: 14,
-        lineNumbers: "on",
-        scrollBeyondLastLine: false,
-        automaticLayout: true,
-        padding: { top: 12, bottom: 12 },
-        wordWrap: "on",
-        tabSize: 4,
-      }}
-    />
+    <>
+      <style>{peerStyles}</style>
+      <Editor
+        height="420px"
+        defaultLanguage="python"
+        theme={theme === "dark" ? "vs-dark" : "light"}
+        onMount={handleMount}
+        options={{
+          minimap: { enabled: false },
+          fontSize: 14,
+          lineNumbers: "on",
+          scrollBeyondLastLine: false,
+          automaticLayout: true,
+          padding: { top: 12, bottom: 12 },
+          wordWrap: "on",
+          tabSize: 4,
+        }}
+      />
+    </>
   );
 };
 

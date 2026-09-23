@@ -328,11 +328,14 @@ const Room = ({ roomId }: { roomId: string }) => {
                 {running ? "Running..." : "Run tests"}
               </button>
             </div>
-            <CollaborativeEditor
-              roomId={roomId}
-              starterCode={problem?.starterCode}
-              onCodeChange={setCode}
-            />
+            {user && (
+              <CollaborativeEditor
+                roomId={roomId}
+                user={{ id: user.id, name: user.name || user.email }}
+                starterCode={problem?.starterCode}
+                onCodeChange={setCode}
+              />
+            )}
             {shown && <VerdictPanel submission={shown} />}
           </section>
 
