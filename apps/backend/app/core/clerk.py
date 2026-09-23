@@ -30,10 +30,12 @@ def _primary_email(payload: dict) -> str:
     raise ClerkProfileError(f"Clerk user {payload.get('id')!r} has no email address")
 
 
-def _display_name(payload: dict, email: str) -> str:
+def _display_name(payload: dict) -> str:
     parts = [payload.get("first_name"), payload.get("last_name")]
     full_name = " ".join(part for part in parts if part).strip()
-    return full_name or payload.get("username") or email.split("@")[0]
+    # Names are shown to everyone in a room and on the room list, so the
+    # fallback must not be the front of an email address.
+    return full_name or payload.get("username") or f"User {str(payload.get('id', ''))[-4:]}"
 
 
 async def fetch_profile(user_id: str) -> tuple[str, str]:
@@ -50,4 +52,4 @@ async def fetch_profile(user_id: str) -> tuple[str, str]:
         raise ClerkProfileError(f"Could not read Clerk profile for {user_id}: {exc}") from exc
 
     email = _primary_email(payload)
-    return email, _display_name(payload, email)
+    return email, _display_name(payload)

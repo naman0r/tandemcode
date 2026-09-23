@@ -52,7 +52,7 @@ def test_a_closed_room_records_nothing_more(client, room):
     pool = client.app.state.db_pool
     with room_socket(client, room["id"], "user_alice"):
         client.post(f"/api/rooms/{room['id']}/leave", headers=auth("user_alice"))
-    client.portal.call(RoomUpdateDAO(pool).record, room["id"], UPDATE)
+    client.portal.call(RoomUpdateDAO(pool).record, room["id"], UPDATE, 1024)
 
     assert client.portal.call(RoomUpdateDAO(pool).list_for_room, room["id"]) == []
 
@@ -89,3 +89,11 @@ def test_rejoining_after_leaving_revives_presence_once(client, room):
         roster(alice)
         with room_socket(client, room["id"], "user_bob") as second:
             assert roster(second) == [("user_alice", "owner"), ("user_bob", "participant")]
+
+
+def test_a_room_stops_recording_at_its_replay_budget(client, room):
+    dao = RoomUpdateDAO(client.app.state.db_pool)
+    assert client.portal.call(dao.record, room["id"], UPDATE, len(UPDATE) * 2)
+    assert client.portal.call(dao.record, room["id"], UPDATE, len(UPDATE) * 2)
+    assert not client.portal.call(dao.record, room["id"], UPDATE, len(UPDATE) * 2)
+    assert len(client.portal.call(dao.list_for_room, room["id"])) == 2
