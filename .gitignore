@@ -12,6 +12,7 @@ apps/backend/.venv/
 
 tech-notes.md
 
-docs/next-steps.md
-
 tmp/*
+
+# Local notes, runbooks and plans. Never committed.
+docs/internal/
