@@ -84,6 +84,7 @@ const RoomView = () => {
 
   const [roomData, setRoomData] = useState<Room | null>(null);
   const [loading, setLoading] = useState(true);
+  const [roomError, setRoomError] = useState<string | null>(null);
   const [currentProblem, setCurrentProblem] = useState<Problem | null>(null);
   const [code, setCode] = useState("# Write your solution here\n");
   const [language, setLanguage] = useState("python");
@@ -94,7 +95,7 @@ const RoomView = () => {
   const [loadingProblems, setLoadingProblems] = useState(false);
 
   const { isConnected, connectionState, messages, members, sendMessage } =
-    useWebSocket(roomId || "");
+    useWebSocket(roomData?.id ?? "");
   const isRoomCreator = roomData?.createdBy === user?.id;
 
   // Fetch room data
@@ -103,17 +104,13 @@ const RoomView = () => {
       if (!roomId) return;
       try {
         setLoading(true);
+        setRoomError(null);
         const room = await roomApi.getRoom(roomId);
         setRoomData(room);
       } catch (err) {
         console.error("Error fetching room:", err);
-        setRoomData({
-          id: "",
-          name: "Room not found",
-          description: "This room may have been deleted.",
-          createdBy: "",
-          currentProblemId: null,
-        });
+        setRoomData(null);
+        setRoomError("This room may be closed or no longer exist.");
       } finally {
         setLoading(false);
       }
@@ -183,6 +180,31 @@ const RoomView = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6 text-center">
             Loading room...
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (roomError || !roomData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+        <Header />
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-8 text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              Room unavailable
+            </h1>
+            <p className="text-gray-600 mb-6">
+              {roomError ?? "This room could not be loaded."}
+            </p>
+            <Link
+              to="/rooms"
+              className="inline-block bg-indigo-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+            >
+              Back to rooms
+            </Link>
           </div>
         </div>
         <Footer />
