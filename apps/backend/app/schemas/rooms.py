@@ -13,8 +13,9 @@ Visibility = Literal["public", "unlisted"]
 
 
 class RoomListing(BaseModel):
-    visibility: Visibility = "public"
-    advertised: bool = False
+    # No defaults: a PUT that left one out must not quietly list a room.
+    visibility: Visibility
+    advertised: bool
 
     @model_validator(mode="after")
     def _advertise_only_in_public(self):
@@ -26,6 +27,8 @@ class RoomListing(BaseModel):
 class CreateRoomRequest(RoomListing):
     name: str = Field(min_length=1, max_length=80)
     description: str | None = Field(default=None, max_length=500)
+    visibility: Visibility = "public"
+    advertised: bool = False
 
 
 class SetProblemRequest(BaseModel):

@@ -1,8 +1,8 @@
 -- V9: Rooms can be unlisted, and public rooms can ask for a partner
 --
 -- Unlisted rooms never appear in the room list; the invite link is the only
--- way in. Advertised is only meaningful on a public room, and turns off when
--- a second person arrives.
+-- way in. Advertised is the owner asking for a partner, only on a public
+-- room; reads hide it while two people are present.
 
 ALTER TABLE rooms
   ADD COLUMN visibility TEXT NOT NULL DEFAULT 'public'

@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import Layout from "../../components/Layout";
+import InviteButton from "../../components/InviteButton";
 import RequireSignIn from "../../components/RequireSignIn";
 import { problemApi, roomApi } from "../../lib/api";
 import type { RoomVisibility } from "../../lib/api";
+import { inviteLink } from "../../lib/format";
 import { badge, button, card, difficulty, input, muted } from "../../lib/ui";
 
 type Problem = { id: string; title: string; difficulty: string };
@@ -17,13 +19,7 @@ const VISIBILITY_OPTIONS: { value: RoomVisibility; label: string; hint: string }
 // An unlisted room is only reachable through its link, so the link is the
 // next thing to show, before the room itself.
 const InviteStep = ({ roomId }: { roomId: string }) => {
-  const [copied, setCopied] = useState(false);
-  const link = `${window.location.origin}/rooms/${roomId}`;
-  const copy = async () => {
-    await navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
+  const link = inviteLink(roomId);
   return (
     <div className={`${card} mx-auto max-w-md space-y-5 p-6`}>
       <div>
@@ -34,9 +30,7 @@ const InviteStep = ({ roomId }: { roomId: string }) => {
       </div>
       <div className="flex gap-2">
         <input className={input} value={link} readOnly onFocus={(event) => event.target.select()} />
-        <button type="button" onClick={copy} className={button.secondary}>
-          {copied ? "Copied" : "Copy"}
-        </button>
+        <InviteButton roomId={roomId} label="Copy" />
       </div>
       <div className="flex justify-end">
         <Link to={`/rooms/${roomId}`} className={button.primary}>
@@ -84,7 +78,12 @@ const CreateRoomForm = () => {
         visibility,
         advertised: visibility === "public" && advertised,
       });
-      if (problem) await roomApi.setRoomProblem(room.id, problem.id);
+      // The room exists either way; a problem can still be picked inside it.
+      if (problem) {
+        await roomApi
+          .setRoomProblem(room.id, problem.id)
+          .catch((err) => console.error("Failed to set the problem:", err));
+      }
       if (visibility === "unlisted") setUnlistedRoomId(room.id);
       else navigate(`/rooms/${room.id}`);
     } catch (err) {

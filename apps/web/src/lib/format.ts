@@ -7,3 +7,5 @@ export const timeAgo = (iso: string): string => {
   if (hours < 24) return `${Math.floor(hours)} h ago`;
   return `${Math.floor(hours / 24)} d ago`;
 };
+
+export const inviteLink = (roomId: string) => `${window.location.origin}/rooms/${roomId}`;

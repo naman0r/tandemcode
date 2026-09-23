@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Check, Link2 } from "lucide-react";
 import Layout from "../../components/Layout";
 import RequireSignIn from "../../components/RequireSignIn";
 import RoomChatComponent from "../../components/RoomChatComponent";
 import RoomMembersPanel from "../../components/RoomMembersPanel";
 import CollaborativeEditor from "../../components/CollaborativeEditor";
+import InviteButton from "../../components/InviteButton";
 import { useUser } from "../../hooks/useUser";
 import useWebSocket from "../../hooks/UseWebSocket";
 import type { Submission } from "../../hooks/UseWebSocket";
@@ -124,22 +124,17 @@ const RunHistory = ({
   </section>
 );
 
-const InviteButton = ({ roomId }: { roomId: string }) => {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    await navigator.clipboard.writeText(`${window.location.origin}/rooms/${roomId}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-  return (
-    <button type="button" onClick={copy} className={button.secondary}>
-      {copied ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
-      {copied ? "Copied" : "Copy invite link"}
-    </button>
-  );
-};
-
-const ListingControls = ({ room, onChange }: { room: Room; onChange: (room: Room) => void }) => {
+// Asking for a partner only means something while you are alone, so the
+// button is not offered once someone has joined.
+const ListingControls = ({
+  room,
+  alone,
+  onChange,
+}: {
+  room: Room;
+  alone: boolean;
+  onChange: (room: Room) => void;
+}) => {
   const [saving, setSaving] = useState(false);
   const save = async (visibility: RoomVisibility, advertised: boolean) => {
     setSaving(true);
@@ -163,7 +158,7 @@ const ListingControls = ({ room, onChange }: { room: Room; onChange: (room: Room
         <option value="public">Public</option>
         <option value="unlisted">Unlisted</option>
       </select>
-      {room.visibility === "public" && (
+      {room.visibility === "public" && alone && (
         <button
           type="button"
           aria-pressed={room.advertised}
@@ -280,12 +275,6 @@ const Room = ({ roomId }: { roomId: string }) => {
       .finally(() => setLoading(false));
   }, [roomId]);
 
-  // The server stops advertising once a second person is here; mirror it
-  // rather than refetch the room.
-  useEffect(() => {
-    if (members.length >= 2) setRoom((current) => (current?.advertised ? { ...current, advertised: false } : current));
-  }, [members.length]);
-
   useEffect(() => {
     if (!room?.currentProblemId) {
       setProblem(null);
@@ -369,7 +358,7 @@ const Room = ({ roomId }: { roomId: string }) => {
             <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-500" : "bg-amber-500"}`} />
             {isConnected ? "Live" : "Connecting"}
           </span>
-          {isOwner && <ListingControls room={room} onChange={setRoom} />}
+          {isOwner && <ListingControls room={room} alone={members.length < 2} onChange={setRoom} />}
           <InviteButton roomId={roomId} />
           <LeaveRoomButton roomId={roomId} />
         </div>

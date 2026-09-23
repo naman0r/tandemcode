@@ -6,13 +6,18 @@ import asyncpg
 
 
 # Joined to users so the room can say who made it by name, not by Clerk id.
+# A room asking for a partner has one once two people are in it, and is
+# asking again if one of them leaves, so advertised is read off the roster.
 SELECT_ROOM = """
     SELECT r.id, r.name, r.description, r.created_by, r.is_active, r.created_at,
-           r.current_problem_id, r.visibility, r.advertised, u.name AS created_by_name,
-           (SELECT COUNT(*) FROM room_members rm
-            WHERE rm.room_id = r.id AND rm.left_at IS NULL) AS member_count
+           r.current_problem_id, r.visibility, u.name AS created_by_name,
+           m.member_count, r.advertised AND m.member_count < 2 AS advertised
     FROM rooms r
     JOIN users u ON u.id = r.created_by
+    CROSS JOIN LATERAL (
+        SELECT COUNT(*) AS member_count FROM room_members rm
+        WHERE rm.room_id = r.id AND rm.left_at IS NULL
+    ) m
 """
 
 
@@ -68,10 +73,8 @@ class RoomDAO:
         """
         query = f"""
             {SELECT_ROOM}
-            WHERE r.is_active = TRUE AND r.visibility = 'public' AND EXISTS (
-                SELECT 1 FROM room_members rm WHERE rm.room_id = r.id AND rm.left_at IS NULL
-            )
-            ORDER BY r.advertised DESC, r.created_at DESC
+            WHERE r.is_active = TRUE AND r.visibility = 'public' AND m.member_count > 0
+            ORDER BY r.advertised AND m.member_count < 2 DESC, r.created_at DESC
             LIMIT $1
         """
         async with self.pool.acquire() as conn:

@@ -15,7 +15,7 @@ from app.dao.users import UserDAO
 
 # Enough for anyone opening rooms by hand; a script hits it in seconds.
 ROOMS_PER_HOUR = 10
-# The newest open rooms. Past this the list is not browsable anyway.
+# Past this the list is not browsable anyway.
 ROOM_LIST_LIMIT = 100
 
 

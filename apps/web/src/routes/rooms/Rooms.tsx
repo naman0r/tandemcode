@@ -72,10 +72,7 @@ const RoomList = () => {
             {room.description || "No description"}
           </p>
           <p className={`${muted} mt-3 text-xs`}>
-            {room.advertised
-              ? `${room.createdByName ?? "Someone"} is waiting for someone to join`
-              : `${room.createdByName ?? "Someone"} · ${room.memberCount} here`}{" "}
-            · opened {timeAgo(room.createdAt)}
+            {room.createdByName ?? "Someone"} · {room.memberCount} here · opened {timeAgo(room.createdAt)}
           </p>
           <Link
             to={`/rooms/${room.id}`}

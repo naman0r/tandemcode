@@ -55,16 +55,6 @@ class RoomMemberDAO:
                     room_id,
                     user_id,
                 )
-                # A room asking for a partner has one once two people are in it.
-                await conn.execute(
-                    """
-                    UPDATE rooms SET advertised = FALSE
-                    WHERE id = $1 AND advertised AND (
-                        SELECT COUNT(*) FROM room_members WHERE room_id = $1 AND left_at IS NULL
-                    ) >= 2
-                    """,
-                    room_id,
-                )
                 return True
 
     async def remove_member(

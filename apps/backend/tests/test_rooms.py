@@ -231,8 +231,9 @@ def test_an_unlisted_room_cannot_be_advertised(client, signed_up):
 def test_advertised_rooms_come_first_until_a_partner_arrives(client, room, signed_up):
     other = client.post("/api/rooms", json={"name": "Later"}, headers=auth("user_alice")).json()
     url = f"/api/rooms/{room['id']}/listing"
-    assert client.put(url, json={"advertised": True}, headers=auth("user_bob")).status_code == 403
-    assert client.put(url, json={"advertised": True}, headers=auth("user_alice")).json()["advertised"] is True
+    ask = {"visibility": "public", "advertised": True}
+    assert client.put(url, json=ask, headers=auth("user_bob")).status_code == 403
+    assert client.put(url, json=ask, headers=auth("user_alice")).status_code == 200
 
     with connect(client, room["id"], "user_alice") as alice, connect(client, other["id"], "user_alice"):
         roster(alice)
@@ -240,11 +241,16 @@ def test_advertised_rooms_come_first_until_a_partner_arrives(client, room, signe
         ids = listed_ids(client)
         assert ids.index(room["id"]) < ids.index(other["id"])
 
-        with connect(client, room["id"], "user_bob"):
+        with connect(client, room["id"], "user_bob") as bob:
             roster(alice)
             fetched = client.get(f"/api/rooms/{room['id']}", headers=auth("user_alice")).json()
             assert fetched["advertised"] is False
             assert fetched["memberCount"] == 2
+            close_socket(bob)
+            roster(alice)
+
+        # Alone again, so asking again.
+        assert client.get(f"/api/rooms/{room['id']}", headers=auth("user_alice")).json()["advertised"] is True
 
 
 def test_the_owner_can_unlist_a_room(client, room):
@@ -252,5 +258,7 @@ def test_the_owner_can_unlist_a_room(client, room):
     with connect(client, room["id"], "user_alice") as alice:
         roster(alice)
         assert room["id"] in listed_ids(client)
-        client.put(url, json={"visibility": "unlisted"}, headers=auth("user_alice"))
+        client.put(url, json={"visibility": "unlisted", "advertised": False}, headers=auth("user_alice"))
         assert room["id"] not in listed_ids(client)
+        # A partial update is refused rather than read as "public".
+        assert client.put(url, json={"advertised": False}, headers=auth("user_alice")).status_code == 422
