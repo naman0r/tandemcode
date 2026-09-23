@@ -66,15 +66,15 @@ const Dashboard = () => {
         <p className={`${muted} mt-1 text-sm`}>Pick up a room or start a new one.</p>
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <Link to="/rooms/create" className={`${card} flex items-center gap-4 p-5 hover:border-indigo-400`}>
-            <Plus className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+          <Link to="/rooms/create" className={`${card} flex items-center gap-4 p-5 hover:border-orange-400`}>
+            <Plus className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             <div>
               <p className="font-medium">Create a room</p>
               <p className={`${muted} text-sm`}>Then send your partner the invite link.</p>
             </div>
           </Link>
-          <Link to="/rooms" className={`${card} flex items-center gap-4 p-5 hover:border-indigo-400`}>
-            <Users className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+          <Link to="/rooms" className={`${card} flex items-center gap-4 p-5 hover:border-orange-400`}>
+            <Users className="h-5 w-5 text-orange-600 dark:text-orange-400" />
             <div>
               <p className="font-medium">Browse open rooms</p>
               <p className={`${muted} text-sm`}>Join a session that is already running.</p>

@@ -77,7 +77,7 @@ const ProblemTable = () => {
                   <td className="px-4 py-3 text-right">
                     <Link
                       to={`/rooms/create?problem=${problem.id}`}
-                      className="text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+                      className="text-sm font-medium text-orange-600 hover:underline dark:text-orange-400"
                     >
                       Solve in a room
                     </Link>

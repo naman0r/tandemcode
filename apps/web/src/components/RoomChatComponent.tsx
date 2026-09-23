@@ -44,7 +44,7 @@ const RoomChatComponent = ({ isConnected, messages, sendMessage }: Props) => {
               <p
                 className={`rounded-2xl px-3 py-1.5 text-sm ${
                   message.isOwn
-                    ? "bg-indigo-600 text-white"
+                    ? "bg-orange-500 text-zinc-950"
                     : "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
                 }`}
               >
