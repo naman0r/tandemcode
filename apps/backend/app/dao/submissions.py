@@ -103,3 +103,8 @@ class SubmissionDAO:
         query = "UPDATE submissions SET status = $2, time_ms = $3, result = $4::jsonb WHERE id = $1"
         async with self.pool.acquire() as conn:
             await conn.execute(query, submission_id, status, time_ms, json.dumps(result))
+
+    async def requeue_running(self) -> int:
+        async with self.pool.acquire() as conn:
+            tag = await conn.execute("UPDATE submissions SET status = 'pending' WHERE status = 'running'")
+        return int(tag.rsplit(" ", 1)[1])

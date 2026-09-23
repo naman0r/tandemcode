@@ -24,6 +24,11 @@ TIME_LIMIT_EXCEEDED = "time_limit_exceeded"
 # database from a print loop.
 OUTPUT_LIMIT = 4_000
 
+# The runner's own environment holds database and Clerk secrets. The program
+# gets none of it: a submission that prints os.environ would otherwise land
+# those secrets in its verdict.
+PROGRAM_ENV = {"PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8"}
+
 
 @dataclass
 class TestOutcome:
@@ -80,6 +85,7 @@ def judge(code: str, tests: list[dict], time_limit_ms: int, mem_limit_mb: int) -
                     capture_output=True,
                     timeout=time_limit_ms / 1000,
                     cwd=workdir,
+                    env=PROGRAM_ENV,
                     preexec_fn=_limits(mem_limit_mb),
                 )
             except subprocess.TimeoutExpired as exc:
@@ -93,10 +99,14 @@ def judge(code: str, tests: list[dict], time_limit_ms: int, mem_limit_mb: int) -
 
             elapsed = int((time.perf_counter() - started) * 1000)
             verdict.timeMs = max(verdict.timeMs, elapsed)
-            stdout, stderr = _clip(completed.stdout), _clip(completed.stderr)
-            passed = completed.returncode == 0 and stdout.strip() == test["expected"].strip()
+            passed = (
+                completed.returncode == 0
+                and completed.stdout.decode("utf-8", errors="replace").strip()
+                == test["expected"].strip()
+            )
             verdict.tests.append(
-                TestOutcome(index, bool(test.get("hidden")), passed, elapsed, stdout, stderr)
+                TestOutcome(index, bool(test.get("hidden")), passed, elapsed,
+                            _clip(completed.stdout), _clip(completed.stderr))
             )
             if passed:
                 verdict.passed += 1

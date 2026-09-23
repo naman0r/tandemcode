@@ -26,8 +26,8 @@ async def judge_next(submissions: SubmissionDAO, problems: ProblemDAO) -> bool:
     if submission is None:
         return False
 
-    spec = await problems.get_judge_spec(submission["problemId"])
     try:
+        spec = await problems.get_judge_spec(submission["problemId"])
         verdict = await asyncio.to_thread(
             judge, submission["code"] or "", spec["tests"], spec["timeLimitMs"], spec["memLimitMb"]
         )
@@ -35,7 +35,7 @@ async def judge_next(submissions: SubmissionDAO, problems: ProblemDAO) -> bool:
         # The judge, not the program, failed. The row must not stay "running"
         # forever, and the user gets told rather than left polling.
         logger.exception("Judge failed for submission %s", submission["id"])
-        verdict = Verdict(status=RUNTIME_ERROR, timeMs=0, passed=0, total=len(spec["tests"]))
+        verdict = Verdict(status=RUNTIME_ERROR, timeMs=0, passed=0, total=0)
 
     await submissions.complete(submission["id"], verdict.status, verdict.timeMs, verdict.as_dict())
     logger.info("Submission %s: %s", submission["id"], verdict.status)
@@ -46,6 +46,10 @@ async def main() -> None:
     logging.basicConfig(level=logging.INFO)
     pool = await create_pool()
     submissions, problems = SubmissionDAO(pool), ProblemDAO(pool)
+    # Rows left "running" by a runner that died mid-judge would never be
+    # claimed again. One runner at a time is the local setup, so on boot
+    # anything still running is ours from before and goes back in the queue.
+    await submissions.requeue_running()
     try:
         while True:
             if not await judge_next(submissions, problems):

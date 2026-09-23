@@ -78,3 +78,16 @@ def test_wrong_answer_reports_the_failing_test(client, room):
     assert judged["status"] == "wrong_answer"
     assert judged["result"]["passed"] == 0
     assert judged["result"]["tests"][0]["stdout"].strip() == "0 0"
+
+
+def test_a_run_left_running_by_a_dead_runner_is_requeued(client, room):
+    submission = submit(client, room, TWO_SUM).json()
+    pool = client.app.state.db_pool
+    dao = SubmissionDAO(pool)
+    assert str(client.portal.call(dao.claim_pending)["id"]) == submission["id"]
+    assert drain_queue(client) == 0
+
+    assert client.portal.call(dao.requeue_running) == 1
+    assert drain_queue(client) == 1
+    judged = client.get(f"/api/submissions/{submission['id']}", headers=auth("user_alice")).json()
+    assert judged["status"] == "accepted"
