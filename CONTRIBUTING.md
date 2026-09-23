@@ -15,11 +15,11 @@ Find the highest migration number in `apps/backend/migrations/` and add the
 next one, named after your problem:
 
 ```
-apps/backend/migrations/V12__add_move_zeroes.sql
+apps/backend/migrations/V13__add_move_zeroes.sql
 ```
 
 ```sql
--- V12: Add the Move Zeroes problem
+-- V13: Add the Move Zeroes problem
 
 INSERT INTO problems (slug, title, difficulty, time_limit_ms, mem_limit_mb, statement, starter_code, tests)
 VALUES (
@@ -64,11 +64,16 @@ $$,
 Text between `$$` markers needs no escaping. If your statement itself contains
 `$$`, use a tagged marker such as `$body$ ... $body$` instead.
 
+The migration must be exactly this one `INSERT` and nothing else: no other
+statements, subqueries or comments between the values. Migrations run on
+deploy, so CI refuses a problem migration of any other shape. Name it
+`V<n>__add_<slug>.sql`.
+
 | Field | Rules |
 |---|---|
 | `slug` | lowercase words joined by hyphens; unique; the solution file is named after it |
 | `difficulty` | `easy`, `medium` or `hard` |
-| `time_limit_ms`, `mem_limit_mb` | per test; leave `2000` and `256` unless the problem needs otherwise |
+| `time_limit_ms`, `mem_limit_mb` | per test; leave `2000` and `256` unless the problem needs otherwise. At most `10000` and `512` |
 | `statement` | the task in terms of the function's arguments and return value, then an `Input:` line and an `Output:` line describing the example format |
 | `starter_code` | see below |
 | `tests` | see below |
@@ -98,8 +103,8 @@ when the program exits cleanly and its output, trimmed of whitespace at both
 ends, equals `expected`, also trimmed.
 
 - At least 5 tests. Every test with `"hidden": false` is shown as an example,
-  so include at least 2 of those. The rest are hidden: people see only whether
-  each passed, never its input or their output.
+  so include at least 2 of those, and put them first. The rest are hidden:
+  people see only whether each passed, never its input or their output.
 - Write `input` exactly as stdin would receive it, including the final `\n`.
 - Every input has exactly one correct output. If several orders are valid,
   say in the statement which one to print, such as "sorted ascending".

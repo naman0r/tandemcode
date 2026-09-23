@@ -2,6 +2,11 @@
 # There is no `log` directive on purpose: the websocket token travels in the
 # query string, and Caddy writes no access log unless told to.
 {$API_DOMAIN} {
+	# The API reads a whole body before it checks the caller, and the largest
+	# real one is 64 KB of code, so anything bigger is refused here.
+	request_body {
+		max_size 256KB
+	}
 	encode gzip
 	header {
 		X-Content-Type-Options nosniff

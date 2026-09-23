@@ -13,8 +13,11 @@ from app.dao.rooms import RoomDAO
 from app.dao.submissions import SubmissionDAO
 from app.dao.users import UserDAO
 
-# Enough for anyone opening rooms by hand; a script hits it in seconds.
+# Enough for anyone opening rooms by hand; a script hits it in seconds. Rooms
+# only close when their owner leaves them empty, and each can store a replay,
+# so the daily cap bounds what one account can make the database hold.
 ROOMS_PER_HOUR = 10
+ROOMS_PER_DAY = 30
 # Past this the list is not browsable anyway.
 ROOM_LIST_LIMIT = 100
 
@@ -90,7 +93,10 @@ class RoomService:
                 detail=f"User not found: {created_by}",
             )
 
-        if await self.room_dao.count_created_since(created_by, 3600) >= ROOMS_PER_HOUR:
+        if (
+            await self.room_dao.count_created_since(created_by, 3600) >= ROOMS_PER_HOUR
+            or await self.room_dao.count_created_since(created_by, 86400) >= ROOMS_PER_DAY
+        ):
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail="Too many new rooms. Try again later.",

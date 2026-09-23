@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
     app.state.db_pool = await create_pool()
     app.state.room_chat_manager = RoomChatManager(EventDAO(app.state.db_pool))
     app.state.yjs_relay_manager = YjsRelayManager(RoomUpdateDAO(app.state.db_pool))
-    verdicts = VerdictListener(app.state.db_pool, app.state.room_chat_manager)
+    verdicts = app.state.verdict_listener = VerdictListener(app.state.db_pool, app.state.room_chat_manager)
     await verdicts.start()
     try:
         yield

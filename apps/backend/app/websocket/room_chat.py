@@ -19,6 +19,11 @@ MAX_CHAT_CHARS = 2000
 # Ten messages in ten seconds is a fast typist; past that it is a script.
 CHAT_BURST = 10
 CHAT_WINDOW_SECONDS = 10.0
+# A long session is a few hundred messages. Past this a room's chat is closed,
+# so no one can grow a replay without bound.
+MAX_CHAT_MESSAGES_PER_ROOM = 2000
+# Two tabs and a reconnect that overlaps the socket it replaces.
+MAX_SOCKETS_PER_USER = 3
 
 
 class RoomChatManager:
@@ -44,6 +49,14 @@ class RoomChatManager:
         participant: Participant,
         room_member_dao: RoomMemberDAO,
     ) -> None:
+        # Every join rebroadcasts the roster to every socket in the room, so an
+        # unbounded number of sockets from one user is quadratic work.
+        open_sockets = sum(
+            1 for other in self.room_sessions.get(room_id, {}).values() if other.user_id == participant.user_id
+        )
+        if open_sockets >= MAX_SOCKETS_PER_USER:
+            raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Too many connections")
+
         # Recorded before the first await, so anything that fails below unwinds
         # through _forget rather than stranding a half-joined socket.
         self.room_sessions[room_id][websocket] = participant
@@ -129,8 +142,8 @@ class RoomChatManager:
             "text": text,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
-        await self.events.record(room_id, "chat", message)
-        await self.broadcast(room_id, message)
+        if await self.events.record(room_id, "chat", message, MAX_CHAT_MESSAGES_PER_ROOM):
+            await self.broadcast(room_id, message)
 
     async def close_user(
         self,

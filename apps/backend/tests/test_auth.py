@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from starlette.websockets import WebSocketDisconnect
 
-from tests.rig import ORIGIN, auth, token
+from tests.rig import ORIGIN, auth, room_socket, token
 
 
 def test_api_requires_a_token(client):
@@ -70,17 +70,18 @@ def test_room_is_owned_by_the_caller_not_the_body(client, signed_up):
 
 def test_submission_is_attributed_to_the_caller_not_the_body(client, room):
     problem_id = client.get("/api/problems", headers=auth("user_alice")).json()[0]["id"]
-    response = client.post(
-        "/api/submissions",
-        json={
-            "roomId": room["id"],
-            "userId": "user_victim",
-            "problemId": problem_id,
-            "language": "python",
-            "code": "print(1)",
-        },
-        headers=auth("user_alice"),
-    )
+    with room_socket(client, room["id"], "user_alice"):
+        response = client.post(
+            "/api/submissions",
+            json={
+                "roomId": room["id"],
+                "userId": "user_victim",
+                "problemId": problem_id,
+                "language": "python",
+                "code": "print(1)",
+            },
+            headers=auth("user_alice"),
+        )
     assert response.json()["userId"] == "user_alice"
 
 

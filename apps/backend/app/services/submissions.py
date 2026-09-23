@@ -4,6 +4,7 @@ import asyncpg
 from fastapi import HTTPException, status
 
 from app.dao.problems import ProblemDAO
+from app.dao.room_members import RoomMemberDAO
 from app.dao.rooms import RoomDAO
 from app.dao.submissions import SubmissionDAO
 from app.dao.users import UserDAO
@@ -13,17 +14,23 @@ from app.services.rooms import get_active_room
 # languages need their own image and are a later ticket.
 SUPPORTED_LANGUAGES = {"python"}
 
+# The runner is one process judging one run at a time. A pair practising
+# hard stays well under this; a script holding the runner does not.
+RUNS_PER_HOUR = 120
+
 
 class SubmissionService:
     def __init__(
         self,
         submission_dao: SubmissionDAO,
         room_dao: RoomDAO,
+        room_member_dao: RoomMemberDAO,
         problem_dao: ProblemDAO,
         user_dao: UserDAO,
     ) -> None:
         self.submission_dao = submission_dao
         self.room_dao = room_dao
+        self.room_member_dao = room_member_dao
         self.problem_dao = problem_dao
         self.user_dao = user_dao
 
@@ -41,6 +48,18 @@ class SubmissionService:
                 detail=f"Unsupported language: {language}",
             )
         await get_active_room(self.room_dao, room_id)
+        # Runs land in the room's history for everyone in it, so only people
+        # in the room get to add to it.
+        if not await self.room_member_dao.is_present(room_id, user_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Join the room to run code in it",
+            )
+        if await self.submission_dao.count_created_since(user_id, 3600) >= RUNS_PER_HOUR:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many runs this hour. Try again later.",
+            )
 
         problem_exists = await self.problem_dao.exists(problem_id)
         if not problem_exists:
