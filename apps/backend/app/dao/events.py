@@ -32,3 +32,12 @@ class EventDAO:
         async with self.pool.acquire() as conn:
             rows = await conn.fetch(query, room_id, limit)
         return [json.loads(row["payload_json"]) for row in rows]
+
+    async def list_for_room(self, room_id: str) -> list[dict]:
+        query = "SELECT ts, type, payload_json FROM events WHERE room_id = $1 ORDER BY id ASC"
+        async with self.pool.acquire() as conn:
+            rows = await conn.fetch(query, room_id)
+        return [
+            {"ts": row["ts"], "type": row["type"], "payload": json.loads(row["payload_json"])}
+            for row in rows
+        ]

@@ -15,44 +15,41 @@ type Room = {
   createdAt: string;
 };
 
-const YourRooms = ({ userId }: { userId: string }) => {
+const RoomRows = ({ active, empty }: { active: boolean; empty: string }) => {
   const [rooms, setRooms] = useState<Room[] | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     roomApi
-      .getRoomsByCreator(userId)
+      .getMyRooms(active)
       .then(setRooms)
       .catch(() => setError(true));
-  }, [userId]);
+  }, [active]);
 
-  if (error) return <p className="text-sm text-red-600">Could not load your rooms.</p>;
+  if (error) return <p className="text-sm text-red-600">Could not load rooms.</p>;
   if (rooms === null) return <p className={`${muted} text-sm`}>Loading...</p>;
-  if (rooms.length === 0) {
-    return (
-      <p className={`${muted} text-sm`}>
-        You have no open rooms. Create one to start a session.
-      </p>
-    );
-  }
+  if (rooms.length === 0) return <p className={`${muted} text-sm`}>{empty}</p>;
 
   return (
     <ul className="divide-y divide-zinc-200 dark:divide-zinc-800">
-      {rooms.map((room) => (
-        <li key={room.id} className="flex items-center justify-between py-3">
-          <div>
-            <Link to={`/rooms/${room.id}`} className="font-medium hover:underline">
-              {room.name}
+      {rooms.map((room) => {
+        const href = active ? `/rooms/${room.id}` : `/rooms/${room.id}/replay`;
+        return (
+          <li key={room.id} className="flex items-center justify-between py-3">
+            <div>
+              <Link to={href} className="font-medium hover:underline">
+                {room.name}
+              </Link>
+              <p className={`${muted} text-xs`}>
+                {room.description || "No description"} · {timeAgo(room.createdAt)}
+              </p>
+            </div>
+            <Link to={href} className={button.secondary}>
+              {active ? "Open" : "Replay"}
             </Link>
-            <p className={`${muted} text-xs`}>
-              {room.description || "No description"} · opened {timeAgo(room.createdAt)}
-            </p>
-          </div>
-          <Link to={`/rooms/${room.id}`} className={button.secondary}>
-            Open
-          </Link>
-        </li>
-      ))}
+          </li>
+        );
+      })}
     </ul>
   );
 };
@@ -86,8 +83,13 @@ const Dashboard = () => {
         </div>
 
         <section className={`${card} mt-6 p-5`}>
-          <h2 className="mb-2 font-semibold">Your open rooms</h2>
-          {user && <YourRooms userId={user.id} />}
+          <h2 className="mb-2 font-semibold">Open rooms</h2>
+          <RoomRows active empty="You are not in any open room." />
+        </section>
+
+        <section className={`${card} mt-6 p-5`}>
+          <h2 className="mb-2 font-semibold">Past sessions</h2>
+          <RoomRows active={false} empty="Closed rooms you were in show up here, with a replay." />
         </section>
       </RequireSignIn>
     </Layout>

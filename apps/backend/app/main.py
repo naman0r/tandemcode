@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import CORS_ORIGINS, RUN_MIGRATIONS_ON_STARTUP
 from app.dao.events import EventDAO
 from app.dao.room_members import RoomMemberDAO
+from app.dao.room_updates import RoomUpdateDAO
 from app.database import create_pool
 from app.dependencies import current_user_id
 from app.migrate import migrate
@@ -30,7 +31,7 @@ async def lifespan(app: FastAPI):
         await migrate()
     app.state.db_pool = await create_pool()
     app.state.room_chat_manager = RoomChatManager(EventDAO(app.state.db_pool))
-    app.state.yjs_relay_manager = YjsRelayManager()
+    app.state.yjs_relay_manager = YjsRelayManager(RoomUpdateDAO(app.state.db_pool))
     verdicts = VerdictListener(app.state.db_pool, app.state.room_chat_manager)
     await verdicts.start()
     try:

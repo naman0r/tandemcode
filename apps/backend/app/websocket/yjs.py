@@ -5,6 +5,8 @@ from collections import defaultdict
 
 from fastapi import WebSocket
 
+from app.dao.room_updates import RoomUpdateDAO
+
 logger = logging.getLogger(__name__)
 
 # y-websocket clients open with SyncStep1 and only consider themselves synced
@@ -14,10 +16,15 @@ logger = logging.getLogger(__name__)
 SYNC_STEP1_PREFIX = b"\x00\x00"
 EMPTY_SYNC_STEP2 = b"\x00\x01\x02\x00\x00"
 
+# SyncStep2 and Update both carry document changes; those are what a replay
+# needs. SyncStep1 is a request and awareness (message type 1) is cursors.
+DOCUMENT_CHANGE_PREFIXES = (b"\x00\x01", b"\x00\x02")
+
 
 class YjsRelayManager:
-    def __init__(self) -> None:
+    def __init__(self, updates: RoomUpdateDAO) -> None:
         self.room_sessions: dict[str, set[WebSocket]] = defaultdict(set)
+        self.updates = updates
 
     async def connect(self, websocket: WebSocket, room_id: str) -> None:
         await websocket.accept()
@@ -52,3 +59,6 @@ class YjsRelayManager:
                 await session.send_bytes(payload)
             except Exception:
                 logger.exception("Failed to relay Yjs binary message for room %s", room_id)
+        # After the relay so a slow disk never delays a keystroke reaching a peer.
+        if payload.startswith(DOCUMENT_CHANGE_PREFIXES):
+            await self.updates.record(room_id, payload)

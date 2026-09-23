@@ -5,8 +5,10 @@ from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.auth import TokenError, clerk_user_id
+from app.dao.events import EventDAO
 from app.dao.problems import ProblemDAO
 from app.dao.room_members import RoomMemberDAO
+from app.dao.room_updates import RoomUpdateDAO
 from app.dao.rooms import RoomDAO
 from app.dao.submissions import SubmissionDAO
 from app.dao.users import UserDAO
@@ -60,6 +62,9 @@ def get_room_service(request: Request) -> RoomService:
         room_member_dao=RoomMemberDAO(pool),
         problem_dao=ProblemDAO(pool),
         user_dao=UserDAO(pool),
+        room_update_dao=RoomUpdateDAO(pool),
+        event_dao=EventDAO(pool),
+        submission_dao=SubmissionDAO(pool),
     )
 
 

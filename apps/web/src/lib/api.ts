@@ -60,9 +60,14 @@ export const roomApi = {
     return response.data;
   },
 
-  // get rooms created by a specific user:
-  getRoomsByCreator: async (userId: string) => {
-    const response = await api.get(`/rooms/user/${userId}`);
+  // Rooms the caller created or joined; active=false is past sessions.
+  getMyRooms: async (active: boolean) => {
+    const response = await api.get("/rooms/mine", { params: { active } });
+    return response.data;
+  },
+
+  getReplay: async (roomId: string) => {
+    const response = await api.get(`/rooms/${roomId}/replay`);
     return response.data;
   },
 
