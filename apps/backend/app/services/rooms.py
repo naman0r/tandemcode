@@ -62,6 +62,18 @@ async def ensure_room_owner(room_dao: RoomDAO, room_id: str, user_id: str) -> di
     return room
 
 
+async def ensure_room_member(room_member_dao: RoomMemberDAO, room: dict, user_id: str) -> None:
+    """The room's owner, or someone who has been in it.
+
+    Entering a room needs only its id, but what happened inside it is for the
+    people who were there: its code, its runs and who is in it. For an
+    unlisted room that keeps the invite link from being the only guard on
+    everything in it.
+    """
+    if room["createdBy"] != user_id and not await room_member_dao.was_member(room["id"], user_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You are not in this room")
+
+
 class RoomService:
     def __init__(
         self,
@@ -123,8 +135,7 @@ class RoomService:
         room = await self.room_dao.get_by_id(room_id)
         if not room:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Room not found: {room_id}")
-        if room["createdBy"] != caller_id and not await self.room_member_dao.was_member(room_id, caller_id):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You were not in this room")
+        await ensure_room_member(self.room_member_dao, room, caller_id)
         return {
             "room": room,
             "updates": [
@@ -135,8 +146,9 @@ class RoomService:
             "submissions": await self.submission_dao.list_by_room(room_id),
         }
 
-    async def list_room_members(self, room_id: str) -> list[dict]:
-        await get_active_room(self.room_dao, room_id)
+    async def list_room_members(self, room_id: str, caller_id: str) -> list[dict]:
+        room = await get_active_room(self.room_dao, room_id)
+        await ensure_room_member(self.room_member_dao, room, caller_id)
         return await self.room_member_dao.list_members(room_id)
 
     async def set_current_problem(self, room_id: str, problem_id, caller_id: str) -> dict:

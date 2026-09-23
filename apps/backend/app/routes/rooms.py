@@ -60,9 +60,10 @@ async def get_replay(
 @router.get("/{room_id}/members", response_model=list[UserInRoomResponse])
 async def list_room_members(
     room_id: str,
+    caller_id: str = Depends(current_user_id),
     service: RoomService = Depends(get_room_service),
 ) -> list[UserInRoomResponse]:
-    members = await service.list_room_members(room_id)
+    members = await service.list_room_members(room_id, caller_id)
     return [UserInRoomResponse.model_validate(member) for member in members]
 
 
