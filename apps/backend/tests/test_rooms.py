@@ -162,3 +162,17 @@ def test_disconnecting_never_closes_a_room(client, room):
         wait_for_roster(client, room["id"], [])
 
     assert client.get(f"/api/rooms/{room['id']}", headers=auth("user_alice")).status_code == 200
+
+
+def test_chat_history_greets_a_late_arrival(client, room):
+    with connect(client, room["id"], "user_alice") as alice:
+        roster(alice)
+        alice.send_json({"type": "chat", "text": "first"})
+        next_chat(alice)
+        alice.send_json({"type": "chat", "text": "second"})
+        next_chat(alice)
+
+    with connect(client, room["id"], "user_bob") as bob:
+        # History first, then the live roster.
+        assert [next_chat(bob)["text"], next_chat(bob)["text"]] == ["first", "second"]
+        assert ("user_bob", "participant") in roster(bob)
