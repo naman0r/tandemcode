@@ -21,12 +21,30 @@ type Problem = {
   samples: { input: string; expected: string }[];
 };
 
+type TestOutcome = {
+  index: number;
+  hidden: boolean;
+  passed: boolean;
+  timeMs: number;
+  stdout: string;
+  stderr: string;
+};
+
 type Submission = {
   id: string;
   status: string;
   language: string;
   createdAt: string;
+  result: {
+    passed: number;
+    total: number;
+    timeMs: number;
+    tests: TestOutcome[];
+  } | null;
 };
+
+const PENDING_STATUSES = new Set(["pending", "running"]);
+const POLL_MS = 1000;
 
 type Room = {
   id: string;
@@ -47,7 +65,53 @@ const STATUS_COLORS: Record<string, string> = {
   running: "text-blue-600 bg-blue-50",
   accepted: "text-green-600 bg-green-50",
   wrong_answer: "text-red-600 bg-red-50",
-  error: "text-red-600 bg-red-50",
+  runtime_error: "text-red-600 bg-red-50",
+  time_limit_exceeded: "text-red-600 bg-red-50",
+};
+
+const VerdictPanel = ({ submission }: { submission: Submission }) => {
+  const { result } = submission;
+  const failed = result?.tests.find((test) => !test.passed);
+  return (
+    <div className="mt-3 text-sm space-y-2">
+      <div className="flex items-center space-x-2">
+        <span className="text-gray-500">Last run:</span>
+        <span
+          className={`px-2 py-0.5 rounded-full font-medium capitalize ${
+            STATUS_COLORS[submission.status] ?? "text-gray-600 bg-gray-50"
+          }`}
+        >
+          {submission.status.replace(/_/g, " ")}
+        </span>
+        {result && (
+          <span className="text-gray-600">
+            {result.passed}/{result.total} tests passed in {result.timeMs}ms
+          </span>
+        )}
+        <span className="text-gray-400 text-xs">
+          {new Date(submission.createdAt).toLocaleTimeString()}
+        </span>
+      </div>
+      {failed && (
+        <div className="border border-red-200 bg-red-50 rounded p-3 space-y-2">
+          <p className="text-red-700 font-medium">
+            Test {failed.index + 1}
+            {failed.hidden ? " (hidden)" : ""} failed
+          </p>
+          {failed.stdout && (
+            <pre className="bg-white border border-gray-200 rounded p-2 whitespace-pre-wrap text-gray-800">
+              {failed.stdout}
+            </pre>
+          )}
+          {failed.stderr && (
+            <pre className="bg-white border border-gray-200 rounded p-2 whitespace-pre-wrap text-red-800">
+              {failed.stderr}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
+  );
 };
 
 const LeaveRoomButton = ({ roomId }: { roomId: string }) => {
@@ -157,6 +221,19 @@ const RoomView = () => {
       console.error("Failed to assign problem:", err);
     }
   };
+
+  // The runner writes the verdict to the row; the room finds out by asking.
+  useEffect(() => {
+    if (!lastSubmission || !PENDING_STATUSES.has(lastSubmission.status)) return;
+    const timer = setInterval(async () => {
+      try {
+        setLastSubmission(await submissionApi.getSubmission(lastSubmission.id));
+      } catch (err) {
+        console.error("Failed to poll submission:", err);
+      }
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [lastSubmission]);
 
   const runCode = async () => {
     if (!roomId || !user || !currentProblem) return;
@@ -303,12 +380,16 @@ const RoomView = () => {
                     className="text-sm border border-gray-300 rounded px-3 py-1"
                   >
                     <option value="python">Python</option>
-                    <option value="javascript">JavaScript</option>
-                    <option value="java">Java</option>
                   </select>
                   <button
                     onClick={runCode}
-                    disabled={isSubmitting || !currentProblem || !user}
+                    disabled={
+                      isSubmitting ||
+                      !currentProblem ||
+                      !user ||
+                      (lastSubmission !== null &&
+                        PENDING_STATUSES.has(lastSubmission.status))
+                    }
                     title={
                       !currentProblem
                         ? "Assign a problem first"
@@ -318,7 +399,11 @@ const RoomView = () => {
                     }
                     className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isSubmitting ? "Submitting..." : "Run code"}
+                    {isSubmitting ||
+                    (lastSubmission &&
+                      PENDING_STATUSES.has(lastSubmission.status))
+                      ? "Running..."
+                      : "Run code"}
                   </button>
                 </div>
               </div>
@@ -330,23 +415,7 @@ const RoomView = () => {
                 onCodeChange={setCode}
               />
 
-              {/* Submission status */}
-              {lastSubmission && (
-                <div className="mt-3 flex items-center space-x-2 text-sm">
-                  <span className="text-gray-500">Last submission:</span>
-                  <span
-                    className={`px-2 py-0.5 rounded-full font-medium capitalize ${
-                      STATUS_COLORS[lastSubmission.status] ??
-                      "text-gray-600 bg-gray-50"
-                    }`}
-                  >
-                    {lastSubmission.status.replace("_", " ")}
-                  </span>
-                  <span className="text-gray-400 text-xs">
-                    {new Date(lastSubmission.createdAt).toLocaleTimeString()}
-                  </span>
-                </div>
-              )}
+              {lastSubmission && <VerdictPanel submission={lastSubmission} />}
             </div>
 
             {/* Problem Statement */}

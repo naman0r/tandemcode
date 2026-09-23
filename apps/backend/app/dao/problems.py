@@ -73,6 +73,17 @@ class ProblemDAO:
             row = await conn.fetchrow(query, slug)
         return _map_problem(row) if row else None
 
+    async def get_judge_spec(self, problem_id: UUID) -> dict:
+        """Everything the runner needs, hidden tests included."""
+        query = "SELECT tests, time_limit_ms, mem_limit_mb FROM problems WHERE id = $1"
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(query, problem_id)
+        return {
+            "tests": json.loads(row["tests"]),
+            "timeLimitMs": row["time_limit_ms"],
+            "memLimitMb": row["mem_limit_mb"],
+        }
+
     async def exists(self, problem_id: UUID) -> bool:
         query = "SELECT EXISTS(SELECT 1 FROM problems WHERE id = $1)"
         async with self.pool.acquire() as conn:

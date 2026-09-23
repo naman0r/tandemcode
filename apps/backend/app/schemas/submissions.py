@@ -13,6 +13,23 @@ class SubmitRequest(BaseModel):
     code: str
 
 
+class TestOutcome(BaseModel):
+    index: int
+    hidden: bool
+    passed: bool
+    timeMs: int
+    stdout: str
+    stderr: str
+
+
+class SubmissionResult(BaseModel):
+    status: str
+    timeMs: int
+    passed: int
+    total: int
+    tests: list[TestOutcome]
+
+
 class SubmissionResponse(BaseModel):
     id: UUID
     roomId: str
@@ -26,3 +43,4 @@ class SubmissionResponse(BaseModel):
     s3KeyStdout: str | None = None
     s3KeyStderr: str | None = None
     s3KeyResultJson: str | None = None
+    result: SubmissionResult | None = None
