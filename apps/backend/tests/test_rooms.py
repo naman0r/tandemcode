@@ -98,6 +98,17 @@ def test_only_the_owner_can_set_the_problem(client, room):
     assert client.patch(url, json={"problemId": problem_id}, headers=auth("user_alice")).status_code == 200
 
 
+def test_the_partner_hears_the_problem_change(client, room):
+    problem_id = client.get("/api/problems", headers=auth("user_alice")).json()[0]["id"]
+    with connect(client, room["id"], "user_bob") as bob:
+        roster(bob)
+        url = f"/api/rooms/{room['id']}/problem"
+        assert client.patch(url, json={"problemId": problem_id}, headers=auth("user_alice")).status_code == 200
+        while (event := bob.receive_json())["type"] != "problem":
+            pass
+        assert event["problemId"] == problem_id
+
+
 def test_a_non_member_cannot_leave(client, room):
     with connect(client, room["id"], "user_alice") as alice:
         roster(alice)

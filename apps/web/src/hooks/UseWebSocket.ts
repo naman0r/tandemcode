@@ -62,6 +62,9 @@ const useWebSocket = (roomId: string) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [members, setMembers] = useState<RoomMember[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  // The owner's latest switch, as an object so switching back to a problem
+  // seen before is still a new value.
+  const [problemChange, setProblemChange] = useState<{ problemId: string } | null>(null);
 
   const { getToken, userId } = useAuth();
   const getTokenRef = useRef(getToken);
@@ -84,6 +87,7 @@ const useWebSocket = (roomId: string) => {
     // A different room is a different conversation and a different roster.
     setMessages([]);
     setMembers([]);
+    setProblemChange(null);
     setConnectionState("connecting");
 
     let disposed = false;
@@ -125,6 +129,11 @@ const useWebSocket = (roomId: string) => {
 
         if (payload.type === "presence") {
           setMembers(payload.members);
+          return;
+        }
+
+        if (payload.type === "problem") {
+          setProblemChange({ problemId: payload.problemId });
           return;
         }
 
@@ -183,6 +192,7 @@ const useWebSocket = (roomId: string) => {
     messages,
     members,
     submissions,
+    problemChange,
     // The socket only carries what happens while it is open; the room loads
     // history through this and reloads it after a reconnect.
     seedSubmissions: (history: Submission[]) =>

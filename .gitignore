@@ -16,3 +16,4 @@ tmp/*
 
 # Local notes, runbooks and plans. Never committed.
 docs/internal/
+brag-output/
