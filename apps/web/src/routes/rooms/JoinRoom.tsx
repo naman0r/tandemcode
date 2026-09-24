@@ -27,7 +27,7 @@ const JoinRoom = () => {
       <RequireSignIn>
         <form onSubmit={submit} className={`${card} mx-auto max-w-md space-y-5 p-6`}>
           <div>
-            <h1 className={`${title} text-4xl`}>Join a room</h1>
+            <h1 className={`${title} text-4xl!`}>Join a room</h1>
             <p className={`${muted} mt-2 text-sm`}>Paste the invite link your partner sent you.</p>
           </div>
           <label className="block text-sm">

@@ -22,7 +22,7 @@ const KIND: Record<string, string> = {
 
 const Caret = ({ who, blink }: { who: Who; blink: boolean }) => (
   <span
-    className={`relative inline-block h-[1.15em] w-[2px] align-text-bottom ${blink ? "animate-pulse" : ""}`}
+    className={`relative inline-block h-[1.15em] w-[2px] align-text-bottom ${blink ? "motion-safe:animate-pulse" : ""}`}
     style={{ background: PEOPLE[who].color }}
   >
     <span
@@ -143,7 +143,7 @@ const HeroSection = () => (
     </section>
 
     <section className="pb-20">
-      <h2 className={`${heading} text-center text-5xl`}>How a session goes</h2>
+      <h2 className={`${heading} text-center text-5xl!`}>How a session goes</h2>
       <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map((step, i) => (
           <div key={step.title} className="px-box bg-zinc-900 p-5 [--px:#27272a]">

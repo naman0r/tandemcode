@@ -195,7 +195,7 @@ const ReplayPage = ({ roomId }: { roomId: string }) => {
     <>
       <div className="mb-6">
         <p className={eyebrow}>REPLAY</p>
-        <h1 className={`${title} mt-3 text-4xl`}>{replay.room.name}</h1>
+        <h1 className={`${title} mt-3 text-4xl!`}>{replay.room.name}</h1>
         <p className={`${muted} mt-2 text-sm`}>
           {replay.room.description ? `${replay.room.description} · ` : ""}
           opened by {replay.room.createdByName ?? "someone"} on {new Date(replay.room.createdAt).toLocaleString()}

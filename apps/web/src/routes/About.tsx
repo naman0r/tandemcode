@@ -195,7 +195,7 @@ const About = () => (
         <section className="grid items-start gap-12 border-y-4 border-zinc-900 py-16 lg:grid-cols-2 lg:gap-20">
           <div>
             <p className={eyebrow}>WITHOUT IT</p>
-            <h2 className={`${heading} mt-3 text-4xl`}>Three tabs that don't talk to each other</h2>
+            <h2 className={`${heading} mt-3 text-4xl!`}>Three tabs that don't talk to each other</h2>
             <p className={`${muted} mt-3 max-w-md leading-relaxed`}>
               A call to talk, a document to type in that cannot run anything, and a judge in another
               tab that only one of you can see.
@@ -206,7 +206,7 @@ const About = () => (
           </div>
           <div>
             <p className={eyebrow}>WITH TANDEMCODE</p>
-            <h2 className={`${heading} mt-3 text-4xl`}>One room</h2>
+            <h2 className={`${heading} mt-3 text-4xl!`}>One room</h2>
             <p className={`${muted} mt-3 max-w-md leading-relaxed`}>
               A shared editor with both cursors, chat beside it, and tests that pass or fail in front
               of both of you. When you are done, replay the session to see how you got there.

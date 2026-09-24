@@ -23,7 +23,7 @@ const InviteStep = ({ roomId }: { roomId: string }) => {
   return (
     <div className={`${card} mx-auto max-w-md space-y-5 p-6`}>
       <div>
-        <h1 className={`${title} text-4xl`}>Your room is ready</h1>
+        <h1 className={`${title} text-4xl!`}>Your room is ready</h1>
         <p className={`${muted} mt-2 text-sm`}>
           It is unlisted, so this link is the only way in. Send it to your partner.
         </p>
@@ -98,7 +98,7 @@ const CreateRoomForm = () => {
   return (
     <form onSubmit={submit} className={`${card} mx-auto max-w-md space-y-5 p-6`}>
       <div>
-        <h1 className={`${title} text-4xl`}>Create a room</h1>
+        <h1 className={`${title} text-4xl!`}>Create a room</h1>
         <p className={`${muted} mt-2 text-sm`}>Every room has an invite link, public or not.</p>
       </div>
 

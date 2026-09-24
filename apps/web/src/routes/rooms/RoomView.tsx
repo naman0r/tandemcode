@@ -397,7 +397,7 @@ const Room = ({ roomId }: { roomId: string }) => {
     <>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className={`${title} flex flex-wrap items-center gap-3 text-4xl`}>
+          <h1 className={`${title} flex flex-wrap items-center gap-3 text-4xl!`}>
             {room.name}
             {room.visibility === "unlisted" && <span className={badge(undefined)}>Unlisted</span>}
           </h1>
