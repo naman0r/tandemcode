@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { UserPlus } from "lucide-react";
 import Layout from "../../components/Layout";
@@ -13,7 +13,7 @@ import type { Submission } from "../../hooks/UseWebSocket";
 import { problemApi, roomApi, submissionApi } from "../../lib/api";
 import type { RoomVisibility } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
-import { badge, button, card, difficulty, muted } from "../../lib/ui";
+import { badge, button, card, difficulty, heading, muted, personColor, title } from "../../lib/ui";
 
 type Problem = {
   id: string;
@@ -41,25 +41,34 @@ type Room = {
 const PENDING_STATUSES = new Set(["pending", "running"]);
 
 const STATUS_TONE: Record<string, string> = {
-  pending: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300",
-  running: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-300",
+  pending: "border-amber-800 bg-amber-950 text-amber-300",
+  running: "border-orange-800 bg-orange-950 text-orange-300",
   accepted: difficulty.easy,
   wrong_answer: difficulty.hard,
   runtime_error: difficulty.hard,
   time_limit_exceeded: difficulty.hard,
 };
 
-const pre = "whitespace-pre-wrap rounded-md border border-zinc-200 bg-zinc-50 p-2 font-mono text-xs dark:border-zinc-800 dark:bg-zinc-950";
+const pre = "whitespace-pre-wrap border-2 border-zinc-800 bg-zinc-950 p-2 font-mono text-xs";
 
-const VerdictPanel = ({ submission }: { submission: Submission }) => {
+// The verdict is the moment the room waits for, so it gets the big type.
+const VERDICT_TEXT: Record<string, string> = {
+  pending: "text-amber-300",
+  running: "text-orange-300",
+  accepted: "text-emerald-400",
+};
+
+const VerdictPanel = ({ submission, color }: { submission: Submission; color: string }) => {
   const { result } = submission;
   const failed = result?.tests.find((test) => !test.passed);
   return (
-    <div className="space-y-2 border-t border-zinc-200 px-4 py-3 text-sm dark:border-zinc-800">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-medium">{submission.userName ?? "Someone"}</span>
-        <span className={badge(STATUS_TONE[submission.status])}>
+    <div className="space-y-2 border-t-4 border-zinc-800 px-4 py-3 text-sm">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className={`font-pixel text-3xl leading-none uppercase ${VERDICT_TEXT[submission.status] ?? "text-red-400"}`}>
           {submission.status.replace(/_/g, " ")}
+        </span>
+        <span className="font-medium" style={{ color }}>
+          {submission.userName ?? "Someone"}
         </span>
         {result && (
           <span className={muted}>
@@ -72,12 +81,12 @@ const VerdictPanel = ({ submission }: { submission: Submission }) => {
       </div>
       {failed && (
         <div className="space-y-2">
-          <p className="text-red-700 dark:text-red-300">
+          <p className="text-red-300">
             Test {failed.index + 1}
             {failed.hidden ? " (hidden)" : ""} failed
           </p>
           {failed.stdout && <pre className={pre}>{failed.stdout}</pre>}
-          {failed.stderr && <pre className={`${pre} text-red-700 dark:text-red-300`}>{failed.stderr}</pre>}
+          {failed.stderr && <pre className={`${pre} text-red-300`}>{failed.stderr}</pre>}
         </div>
       )}
     </div>
@@ -88,13 +97,15 @@ const RunHistory = ({
   submissions,
   selectedId,
   onSelect,
+  colorOf,
 }: {
   submissions: Submission[];
   selectedId: string | null;
   onSelect: (submission: Submission) => void;
+  colorOf: (userId: string) => string;
 }) => (
   <section className={`${card} p-4`}>
-    <h2 className="mb-3 font-semibold">Runs</h2>
+    <h2 className={`${heading} mb-3`}>Runs</h2>
     {submissions.length === 0 ? (
       <p className={`${muted} text-sm`}>No runs yet.</p>
     ) : (
@@ -104,9 +115,10 @@ const RunHistory = ({
             <button
               type="button"
               onClick={() => onSelect(submission)}
-              className={`flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-100 dark:hover:bg-zinc-800 ${
-                submission.id === selectedId ? "bg-zinc-100 dark:bg-zinc-800" : ""
+              className={`flex w-full items-center justify-between gap-2 border-l-4 px-2 py-1.5 text-left text-sm hover:bg-zinc-800 ${
+                submission.id === selectedId ? "bg-zinc-800" : ""
               }`}
+              style={{ borderColor: colorOf(submission.userId) }}
             >
               <span className="truncate">
                 {submission.userName ?? "Someone"}
@@ -154,7 +166,7 @@ const ListingControls = ({
       <div
         role="radiogroup"
         aria-label="Who can find this room"
-        className="inline-flex shrink-0 rounded-lg border border-zinc-300 bg-white p-0.5 dark:border-zinc-700 dark:bg-zinc-900"
+        className="px-box inline-flex shrink-0 bg-zinc-900 [--px:#3f3f46]"
       >
         {VISIBILITIES.map((visibility) => (
           <button
@@ -164,10 +176,8 @@ const ListingControls = ({
             aria-checked={room.visibility === visibility}
             disabled={saving}
             onClick={() => visibility !== room.visibility && save(visibility, room.advertised)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors disabled:cursor-not-allowed ${
-              room.visibility === visibility
-                ? "bg-zinc-900 text-white dark:bg-zinc-100 dark:text-zinc-900"
-                : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+            className={`px-3 py-1.5 font-pixel text-xl leading-none capitalize transition-colors disabled:cursor-not-allowed ${
+              room.visibility === visibility ? "bg-orange-500 text-zinc-950" : "text-zinc-400 hover:text-zinc-100"
             }`}
           >
             {visibility}
@@ -185,8 +195,8 @@ const ListingControls = ({
         >
           {room.advertised ? (
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" />
+              <span className="absolute inline-flex h-full w-full animate-ping bg-orange-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 bg-orange-500" />
             </span>
           ) : (
             <UserPlus className="h-4 w-4" />
@@ -240,12 +250,12 @@ const ProblemPicker = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className={`${card} flex max-h-[70vh] w-full max-w-lg flex-col shadow-xl`}
+        className={`${card} flex max-h-[70vh] w-full max-w-lg flex-col`}
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-zinc-200 px-5 py-3 dark:border-zinc-800">
+        <div className="flex items-center justify-between border-b-2 border-zinc-800 px-5 py-3">
           <div>
-            <h2 className="font-semibold">Choose a problem</h2>
+            <h2 className={heading}>Choose a problem</h2>
             <p className={`${muted} text-xs`}>The editor switches to the new problem's starter code.</p>
           </div>
           <button type="button" onClick={onClose} className={button.ghost}>
@@ -259,7 +269,7 @@ const ProblemPicker = ({
               key={problem.id}
               type="button"
               onClick={() => onPick(problem)}
-              className="flex w-full items-center justify-between border-b border-zinc-100 px-5 py-3 text-left text-sm hover:bg-zinc-50 dark:border-zinc-800 dark:hover:bg-zinc-800"
+              className="flex w-full items-center justify-between border-b-2 border-zinc-800 px-5 py-3 text-left text-sm hover:bg-zinc-800"
             >
               <span>
                 {problem.title}
@@ -289,6 +299,11 @@ const Room = ({ roomId }: { roomId: string }) => {
   const { isConnected, connectionState, messages, members, submissions, problemChange, seedSubmissions, sendMessage } =
     useWebSocket(room?.id ?? "");
   const isOwner = room?.createdBy === user?.id;
+  const rosterKey = members.map((member) => member.userId).join(" ");
+  const colorOf = useCallback(
+    (userId: string) => personColor(userId, user?.id, rosterKey.split(" ")),
+    [user?.id, rosterKey],
+  );
   // Explicit selection wins; otherwise the newest run is what the room is looking at.
   const shown = submissions.find((item) => item.id === selectedId) ?? submissions[0] ?? null;
   const running =
@@ -362,7 +377,7 @@ const Room = ({ roomId }: { roomId: string }) => {
   if (!room) {
     return (
       <div className={`${card} mx-auto max-w-md p-8 text-center`}>
-        <h1 className="text-lg font-semibold">Room unavailable</h1>
+        <h1 className={heading}>Room unavailable</h1>
         <p className={`${muted} mt-1 mb-6 text-sm`}>
           It may have closed, or the link is wrong. If you were in it, the session can be replayed.
         </p>
@@ -382,18 +397,18 @@ const Room = ({ roomId }: { roomId: string }) => {
     <>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+          <h1 className={`${title} flex flex-wrap items-center gap-3 text-4xl`}>
             {room.name}
             {room.visibility === "unlisted" && <span className={badge(undefined)}>Unlisted</span>}
           </h1>
-          <p className={`${muted} mt-1 text-sm`}>
+          <p className={`${muted} mt-2 text-sm`}>
             {room.description ? `${room.description} · ` : ""}
             opened by {room.createdByName ?? "someone"}
           </p>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <span className={`${muted} mr-2 flex items-center gap-1.5 text-xs`}>
-            <span className={`h-2 w-2 rounded-full ${isConnected ? "bg-emerald-500" : "bg-amber-500"}`} />
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <span className={`${muted} mr-2 flex items-center gap-1.5 font-pixel text-lg`}>
+            <span className={`h-2 w-2 ${isConnected ? "bg-emerald-500" : "animate-pulse bg-amber-500"}`} />
             {isConnected ? "Live" : "Connecting"}
           </span>
           {isOwner && <ListingControls room={room} alone={members.length < 2} onChange={setRoom} />}
@@ -405,8 +420,8 @@ const Room = ({ roomId }: { roomId: string }) => {
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <section className={`${card} overflow-hidden`}>
-            <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
-              <span className={`${muted} text-xs`}>Python 3.11</span>
+            <div className="flex items-center justify-between border-b-4 border-zinc-800 px-4 py-2">
+              <span className={`${muted} font-pixel text-lg`}>Python 3.11</span>
               <button
                 type="button"
                 onClick={run}
@@ -425,19 +440,20 @@ const Room = ({ roomId }: { roomId: string }) => {
                 starterCode={problem?.starterCode}
                 replacesOnProblemChange={isOwner}
                 onCodeChange={setCode}
+                colorOf={colorOf}
               />
             )}
             {runError && (
-              <p className="border-t border-zinc-200 px-4 py-2 text-sm text-red-700 dark:border-zinc-800 dark:text-red-300">
+              <p className="border-t-2 border-zinc-800 px-4 py-2 text-sm text-red-300">
                 {runError}
               </p>
             )}
-            {shown && <VerdictPanel submission={shown} />}
+            {shown && <VerdictPanel submission={shown} color={colorOf(shown.userId)} />}
           </section>
 
           <section className={`${card} p-5`}>
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 font-semibold">
+              <h2 className={`${heading} flex flex-wrap items-center gap-2`}>
                 {problem ? problem.title : "No problem chosen"}
                 {problem && <span className={badge(difficulty[problem.difficulty])}>{problem.difficulty}</span>}
               </h2>
@@ -480,13 +496,14 @@ const Room = ({ roomId }: { roomId: string }) => {
         </div>
 
         <div className="space-y-6">
-          <RoomMembersPanel members={members} connectionState={connectionState} />
+          <RoomMembersPanel members={members} connectionState={connectionState} colorOf={colorOf} />
           <RunHistory
             submissions={submissions}
             selectedId={shown?.id ?? null}
             onSelect={(submission) => setSelectedId(submission.id)}
+            colorOf={colorOf}
           />
-          <RoomChatComponent isConnected={isConnected} messages={messages} sendMessage={sendMessage} />
+          <RoomChatComponent isConnected={isConnected} messages={messages} sendMessage={sendMessage} colorOf={colorOf} />
         </div>
       </div>
 

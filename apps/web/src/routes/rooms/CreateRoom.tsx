@@ -7,7 +7,7 @@ import RequireSignIn from "../../components/RequireSignIn";
 import { problemApi, roomApi } from "../../lib/api";
 import type { RoomVisibility } from "../../lib/api";
 import { inviteLink } from "../../lib/format";
-import { badge, button, card, difficulty, input, muted } from "../../lib/ui";
+import { badge, button, card, difficulty, input, muted, title } from "../../lib/ui";
 
 type Problem = { id: string; title: string; difficulty: string };
 
@@ -23,12 +23,12 @@ const InviteStep = ({ roomId }: { roomId: string }) => {
   return (
     <div className={`${card} mx-auto max-w-md space-y-5 p-6`}>
       <div>
-        <h1 className="text-xl font-semibold">Your room is ready</h1>
-        <p className={`${muted} mt-1 text-sm`}>
+        <h1 className={`${title} text-4xl`}>Your room is ready</h1>
+        <p className={`${muted} mt-2 text-sm`}>
           It is unlisted, so this link is the only way in. Send it to your partner.
         </p>
       </div>
-      <div className="flex gap-2">
+      <div className="flex gap-3">
         <input className={input} value={link} readOnly onFocus={(event) => event.target.select()} />
         <InviteButton roomId={roomId} label="Copy" />
       </div>
@@ -98,12 +98,12 @@ const CreateRoomForm = () => {
   return (
     <form onSubmit={submit} className={`${card} mx-auto max-w-md space-y-5 p-6`}>
       <div>
-        <h1 className="text-xl font-semibold">Create a room</h1>
-        <p className={`${muted} mt-1 text-sm`}>Every room has an invite link, public or not.</p>
+        <h1 className={`${title} text-4xl`}>Create a room</h1>
+        <p className={`${muted} mt-2 text-sm`}>Every room has an invite link, public or not.</p>
       </div>
 
       {problem && (
-        <div className="flex items-center justify-between rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm dark:border-orange-900 dark:bg-orange-950">
+        <div className="flex items-center justify-between border-2 border-orange-800 bg-orange-950 px-3 py-2 text-sm">
           <span>
             Problem: <span className="font-medium">{problem.title}</span>
           </span>
@@ -141,10 +141,10 @@ const CreateRoomForm = () => {
         {VISIBILITY_OPTIONS.map((option) => (
           <label
             key={option.value}
-            className={`flex cursor-pointer gap-3 rounded-lg border px-3 py-2 ${
+            className={`flex cursor-pointer gap-3 border-2 px-3 py-2 ${
               visibility === option.value
-                ? "border-orange-500 bg-orange-50 dark:bg-orange-950"
-                : "border-zinc-300 dark:border-zinc-700"
+                ? "border-orange-500 bg-orange-950"
+                : "border-zinc-700 hover:border-zinc-500"
             }`}
           >
             <input
@@ -180,10 +180,10 @@ const CreateRoomForm = () => {
         </label>
       )}
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-400">{error}</p>}
 
       <div className="flex items-center justify-between">
-        <Link to="/rooms" className={`${muted} text-sm hover:underline`}>
+        <Link to="/rooms" className={`${muted} text-sm hover:text-zinc-100`}>
           Back to rooms
         </Link>
         <button type="submit" disabled={creating || !name.trim()} className={button.primary}>

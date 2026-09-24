@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import Layout from "../components/Layout";
 import RequireSignIn from "../components/RequireSignIn";
 import { problemApi } from "../lib/api";
-import { badge, button, card, difficulty, muted } from "../lib/ui";
+import { badge, button, card, difficulty, muted, title } from "../lib/ui";
 
 type Problem = {
   id: string;
@@ -31,20 +31,20 @@ const ProblemTable = () => {
 
   return (
     <>
-      <div className="mb-4 flex gap-2">
+      <div className="mb-6 flex flex-wrap gap-3">
         {FILTERS.map((value) => (
           <button
             key={value}
             type="button"
             onClick={() => setFilter(value)}
-            className={`${filter === value ? button.primary : button.secondary} px-3 py-1 capitalize`}
+            className={`${filter === value ? button.primary : button.secondary} capitalize`}
           >
             {value}
           </button>
         ))}
       </div>
 
-      {error && <p className="text-sm text-red-600">Could not load problems.</p>}
+      {error && <p className="text-sm text-red-400">Could not load problems.</p>}
       {!error && problems === null && <p className={`${muted} text-sm`}>Loading...</p>}
       {problems && problems.length === 0 && (
         <p className={`${muted} text-sm`}>No problems match this filter.</p>
@@ -53,16 +53,16 @@ const ProblemTable = () => {
       {problems && problems.length > 0 && (
         <div className={`${card} overflow-hidden`}>
           <table className="w-full text-sm">
-            <thead className={`${muted} border-b border-zinc-200 bg-zinc-50 text-left text-xs dark:border-zinc-800 dark:bg-zinc-900`}>
+            <thead className={`${muted} border-b-2 border-zinc-800 bg-zinc-950/40 text-left font-pixel text-lg`}>
               <tr>
-                <th className="px-4 py-2 font-medium">Problem</th>
-                <th className="px-4 py-2 font-medium">Difficulty</th>
+                <th className="px-4 py-2 font-normal">Problem</th>
+                <th className="px-4 py-2 font-normal">Difficulty</th>
                 <th className="px-4 py-2" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            <tbody className="divide-y-2 divide-zinc-800">
               {problems.map((problem) => (
-                <tr key={problem.id}>
+                <tr key={problem.id} className="hover:bg-zinc-800/40">
                   <td className="px-4 py-3 font-medium">
                     {problem.title}
                     {!problem.statement && (
@@ -77,7 +77,7 @@ const ProblemTable = () => {
                   <td className="px-4 py-3 text-right">
                     <Link
                       to={`/rooms/create?problem=${problem.id}`}
-                      className="text-sm font-medium text-orange-600 hover:underline dark:text-orange-400"
+                      className="font-pixel text-xl text-orange-400 hover:text-orange-300"
                     >
                       Solve in a room
                     </Link>
@@ -95,10 +95,10 @@ const ProblemTable = () => {
 const Problems = () => (
   <Layout>
     <RequireSignIn>
-      <div className="mb-6 flex items-end justify-between">
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Problems</h1>
-          <p className={`${muted} mt-1 text-sm`}>
+          <h1 className={title}>Problems</h1>
+          <p className={`${muted} mt-3 text-sm`}>
             Pick one and solve it with a partner. Programs read stdin and print the answer.
           </p>
         </div>

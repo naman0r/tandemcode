@@ -6,7 +6,7 @@ import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
 import { MonacoBinding } from "y-monaco";
 import { WS_BASE_URL } from "../lib/config";
-import { useTheme } from "../lib/theme";
+import { EDITOR_THEME, defineEditorTheme } from "../lib/monaco";
 
 interface Props {
   roomId: string;
@@ -18,39 +18,25 @@ interface Props {
   // clients swapping at once would merge into two copies of the starter.
   replacesOnProblemChange: boolean;
   onCodeChange: (code: string) => void;
+  // The colour a user id is shown in everywhere else in the room.
+  colorOf: (userId: string) => string;
 }
-
-// Distinct enough to tell two people apart and readable on both themes.
-const CURSOR_COLORS = [
-  "#2563eb",
-  "#db2777",
-  "#16a34a",
-  "#d97706",
-  "#7c3aed",
-  "#0891b2",
-];
-
-const colorFor = (id: string): string => {
-  let hash = 0;
-  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
-  return CURSOR_COLORS[hash % CURSOR_COLORS.length];
-};
 
 // y-monaco tags each remote selection with the peer's Yjs client id and
 // leaves the colouring to us. One stylesheet, rewritten whenever the set of
 // peers or their names change. Awareness state is whatever the peer sent, so
 // the colour is picked here and the name is escaped before it enters CSS.
-const cursorStyles = (awareness: WebsocketProvider["awareness"]): string => {
+const cursorStyles = (awareness: WebsocketProvider["awareness"], colorOf: Props["colorOf"]): string => {
   const rules: string[] = [];
   awareness.getStates().forEach((state, clientId) => {
     if (clientId === awareness.clientID || !state.user) return;
     const peer = state.user as { id?: unknown; name?: unknown };
     const name = CSS.escape(String(peer.name ?? ""));
-    const color = colorFor(String(peer.id ?? clientId));
+    const color = colorOf(String(peer.id ?? clientId));
     rules.push(
       `.yRemoteSelection-${clientId} { background-color: ${color}33; }`,
       `.yRemoteSelectionHead-${clientId} { position: relative; border-left: 2px solid ${color}; }`,
-      `.yRemoteSelectionHead-${clientId}::after { content: "${name}"; position: absolute; top: -1.3em; left: -2px; padding: 0 4px; border-radius: 3px; font-size: 11px; line-height: 1.3em; color: white; background-color: ${color}; white-space: nowrap; pointer-events: none; }`,
+      `.yRemoteSelectionHead-${clientId}::after { content: "${name}"; position: absolute; top: -1.3em; left: -2px; padding: 0 4px; font-family: "Jersey 10", monospace; font-size: 15px; line-height: 1.2em; color: #0a0a0b; background-color: ${color}; white-space: nowrap; pointer-events: none; }`,
     );
   });
   return rules.join("\n");
@@ -72,9 +58,9 @@ const CollaborativeEditor = ({
   starterCode,
   replacesOnProblemChange,
   onCodeChange,
+  colorOf,
 }: Props) => {
   const { getToken, isLoaded, isSignedIn, sessionId } = useAuth();
-  const { theme } = useTheme();
   // Held in a ref so that a fresh getToken identity from Clerk cannot re-run the
   // effect below and tear down the shared document mid-session.
   const getTokenRef = useRef(getToken);
@@ -88,6 +74,8 @@ const CollaborativeEditor = ({
   // Same reason as getTokenRef: a new user object must not rebuild the document.
   const userRef = useRef(user);
   userRef.current = user;
+  const colorOfRef = useRef(colorOf);
+  colorOfRef.current = colorOf;
   const starterCodeRef = useRef(starterCode);
   starterCodeRef.current = starterCode;
 
@@ -163,7 +151,7 @@ const CollaborativeEditor = ({
         name: userRef.current.name,
       });
       provider.awareness.on("change", () =>
-        setPeerStyles(cursorStyles(provider.awareness)),
+        setPeerStyles(cursorStyles(provider.awareness, colorOfRef.current)),
       );
 
       refresh = setInterval(async () => {
@@ -211,6 +199,12 @@ const CollaborativeEditor = ({
     seedStarterCode(ydoc);
   }, [problemId, starterCode, replacesOnProblemChange]);
 
+  // The roster decides colours, so a join or leave can recolour a cursor.
+  useEffect(() => {
+    const provider = providerRef.current;
+    if (provider) setPeerStyles(cursorStyles(provider.awareness, colorOf));
+  }, [colorOf]);
+
   const handleMount: OnMount = (editor) => {
     editorRef.current = editor;
 
@@ -229,7 +223,8 @@ const CollaborativeEditor = ({
       <Editor
         height="420px"
         defaultLanguage="python"
-        theme={theme === "dark" ? "vs-dark" : "light"}
+        theme={EDITOR_THEME}
+        beforeMount={defineEditorTheme}
         onMount={handleMount}
         options={{
           minimap: { enabled: false },

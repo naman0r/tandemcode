@@ -10,8 +10,8 @@ import { readSyncMessage } from "y-protocols/sync";
 import Layout from "../../components/Layout";
 import RequireSignIn from "../../components/RequireSignIn";
 import { roomApi } from "../../lib/api";
-import { useTheme } from "../../lib/theme";
-import { badge, button, card, difficulty, muted } from "../../lib/ui";
+import { EDITOR_THEME, defineEditorTheme } from "../../lib/monaco";
+import { button, card, eyebrow, heading, muted, title } from "../../lib/ui";
 
 type Replay = {
   room: { id: string; name: string; description: string | null; createdByName: string | null; createdAt: string };
@@ -49,7 +49,6 @@ const clock = (ms: number) => {
 };
 
 const Timeline = ({ replay }: { replay: Replay }) => {
-  const { theme } = useTheme();
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
   const docRef = useRef(new Y.Doc());
   const appliedRef = useRef(0);
@@ -68,7 +67,7 @@ const Timeline = ({ replay }: { replay: Replay }) => {
       text: `${submission.userName ?? "Someone"} ran the tests: ${submission.status.replace(/_/g, " ")}${
         submission.result ? ` (${submission.result.passed}/${submission.result.total})` : ""
       }`,
-      tone: submission.status === "accepted" ? difficulty.easy : difficulty.hard,
+      tone: submission.status === "accepted" ? "text-emerald-400" : "text-red-300",
     }));
     return [...chats, ...runs].sort((a, b) => a.ts - b.ts);
   }, [replay]);
@@ -110,8 +109,8 @@ const Timeline = ({ replay }: { replay: Replay }) => {
   return (
     <div className="grid gap-6 lg:grid-cols-3">
       <section className={`${card} overflow-hidden lg:col-span-2`}>
-        <div className="flex items-center gap-3 border-b border-zinc-200 px-4 py-2 dark:border-zinc-800">
-          <button type="button" onClick={togglePlay} className={`${button.secondary} px-2`} aria-label={playing ? "Pause" : "Play"}>
+        <div className="flex items-center gap-3 border-b-4 border-zinc-800 px-4 py-2">
+          <button type="button" onClick={togglePlay} className={`${button.secondary} px-2!`} aria-label={playing ? "Pause" : "Play"}>
             {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
           </button>
           <input
@@ -126,14 +125,15 @@ const Timeline = ({ replay }: { replay: Replay }) => {
             className="flex-1 accent-orange-500"
             aria-label="Position in session"
           />
-          <span className={`${muted} w-24 text-right font-mono text-xs`}>
+          <span className={`${muted} w-28 text-right font-mono text-xs`}>
             {clock(now - startedAt)} · {position}/{frames.length}
           </span>
         </div>
         <Editor
           height="480px"
           defaultLanguage="python"
-          theme={theme === "dark" ? "vs-dark" : "light"}
+          theme={EDITOR_THEME}
+          beforeMount={defineEditorTheme}
           onMount={(editor) => {
             editorRef.current = editor;
             editor.setValue(docRef.current.getText("code").toString());
@@ -143,7 +143,7 @@ const Timeline = ({ replay }: { replay: Replay }) => {
       </section>
 
       <section className={`${card} p-4`}>
-        <h2 className="mb-3 font-semibold">What happened</h2>
+        <h2 className={`${heading} mb-3`}>What happened</h2>
         {moments.length === 0 ? (
           <p className={`${muted} text-sm`}>No chat or runs in this session.</p>
         ) : (
@@ -153,7 +153,7 @@ const Timeline = ({ replay }: { replay: Replay }) => {
               return (
                 <li key={index} className={`flex gap-2 ${happened ? "" : "opacity-40"}`}>
                   <span className={`${muted} w-10 shrink-0 font-mono text-xs`}>{clock(moment.ts - startedAt)}</span>
-                  <span className={moment.tone ? badge(moment.tone) : ""}>{moment.text}</span>
+                  <span className={moment.tone ?? ""}>{moment.text}</span>
                 </li>
               );
             })}
@@ -180,7 +180,7 @@ const ReplayPage = ({ roomId }: { roomId: string }) => {
   if (error) {
     return (
       <div className={`${card} mx-auto max-w-md p-8 text-center`}>
-        <h1 className="text-lg font-semibold">Replay unavailable</h1>
+        <h1 className={heading}>Replay unavailable</h1>
         <p className={`${muted} mt-1 mb-6 text-sm`}>{error}</p>
         <Link to="/dashboard" className={button.primary}>
           Back to dashboard
@@ -194,9 +194,9 @@ const ReplayPage = ({ roomId }: { roomId: string }) => {
   return (
     <>
       <div className="mb-6">
-        <p className={`${muted} text-xs uppercase tracking-wide`}>Replay</p>
-        <h1 className="text-2xl font-semibold">{replay.room.name}</h1>
-        <p className={`${muted} mt-1 text-sm`}>
+        <p className={eyebrow}>REPLAY</p>
+        <h1 className={`${title} mt-3 text-4xl`}>{replay.room.name}</h1>
+        <p className={`${muted} mt-2 text-sm`}>
           {replay.room.description ? `${replay.room.description} · ` : ""}
           opened by {replay.room.createdByName ?? "someone"} on {new Date(replay.room.createdAt).toLocaleString()}
         </p>

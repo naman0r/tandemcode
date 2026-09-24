@@ -5,6 +5,7 @@ import { WS_BASE_URL } from "../lib/config";
 
 export interface ChatMessage {
   id: string;
+  userId: string;
   text: string;
   username: string;
   timestamp: Date;
@@ -147,6 +148,7 @@ const useWebSocket = (roomId: string) => {
             ...prev,
             {
               id: `${payload.userId}-${payload.timestamp}-${prev.length}`,
+              userId: payload.userId,
               text: payload.text,
               username: payload.userId === userId ? "You" : payload.username,
               timestamp: new Date(payload.timestamp),
