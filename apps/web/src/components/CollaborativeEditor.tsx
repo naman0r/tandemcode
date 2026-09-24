@@ -88,9 +88,9 @@ const CollaborativeEditor = ({
   writesStarterRef.current = writesStarter;
 
   // The relay keeps no document, so a room's text lives only in its peers. The
-  // starter code goes in when the shared text is empty after sync, which is
-  // the first person to arrive with a problem assigned. Any later arrival
-  // syncs their text instead and leaves it alone. Once per document: a
+  // starter code goes in when the shared text is empty after sync, written by
+  // the one client allowed to (writesStarter). Any later arrival syncs their
+  // text instead and leaves it alone. Once per document: a
   // reconnect after someone cleared the editor must not put it back.
   const seededRef = useRef(false);
   // The problem the text was written for. Switching problems replaces the
