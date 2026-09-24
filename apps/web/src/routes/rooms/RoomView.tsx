@@ -439,6 +439,7 @@ const Room = ({ roomId }: { roomId: string }) => {
                 problemId={problem?.id}
                 starterCode={problem?.starterCode}
                 replacesOnProblemChange={isOwner}
+                writesStarter={isOwner || !members.some((member) => member.userId === room.createdBy)}
                 onCodeChange={setCode}
                 colorOf={colorOf}
               />
