@@ -299,6 +299,11 @@ const Room = ({ roomId }: { roomId: string }) => {
   const { isConnected, connectionState, messages, members, submissions, problemChange, seedSubmissions, sendMessage } =
     useWebSocket(room?.id ?? "");
   const isOwner = room?.createdBy === user?.id;
+  // One writer per room for the starter code: the owner, or with the owner
+  // away, the lowest user id, so every client agrees without talking.
+  const starterWriter = members.some((member) => member.userId === room?.createdBy)
+    ? room?.createdBy
+    : members.map((member) => member.userId).sort()[0];
   const rosterKey = members.map((member) => member.userId).join(" ");
   const colorOf = useCallback(
     (userId: string) => personColor(userId, user?.id, rosterKey.split(" ")),
@@ -439,6 +444,7 @@ const Room = ({ roomId }: { roomId: string }) => {
                 problemId={problem?.id}
                 starterCode={problem?.starterCode}
                 replacesOnProblemChange={isOwner}
+                writesStarter={isOwner || starterWriter === user.id}
                 onCodeChange={setCode}
                 colorOf={colorOf}
               />

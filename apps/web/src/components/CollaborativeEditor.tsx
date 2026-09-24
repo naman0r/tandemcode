@@ -17,6 +17,11 @@ interface Props {
   // the text; everyone else receives the swap through the document. Two
   // clients swapping at once would merge into two copies of the starter.
   replacesOnProblemChange: boolean;
+  // Whether this client may put the starter into an empty document. One
+  // writer per room, for the same reason: when the owner picks a problem, a
+  // partner hears about it before the owner's insert arrives, sees an empty
+  // document, and would insert a second copy.
+  writesStarter: boolean;
   onCodeChange: (code: string) => void;
   // The colour a user id is shown in everywhere else in the room.
   colorOf: (userId: string) => string;
@@ -57,6 +62,7 @@ const CollaborativeEditor = ({
   problemId,
   starterCode,
   replacesOnProblemChange,
+  writesStarter,
   onCodeChange,
   colorOf,
 }: Props) => {
@@ -78,11 +84,13 @@ const CollaborativeEditor = ({
   colorOfRef.current = colorOf;
   const starterCodeRef = useRef(starterCode);
   starterCodeRef.current = starterCode;
+  const writesStarterRef = useRef(writesStarter);
+  writesStarterRef.current = writesStarter;
 
   // The relay keeps no document, so a room's text lives only in its peers. The
-  // starter code goes in when the shared text is empty after sync, which is
-  // the first person to arrive with a problem assigned. Any later arrival
-  // syncs their text instead and leaves it alone. Once per document: a
+  // starter code goes in when the shared text is empty after sync, written by
+  // the one client allowed to (writesStarter). Any later arrival syncs their
+  // text instead and leaves it alone. Once per document: a
   // reconnect after someone cleared the editor must not put it back.
   const seededRef = useRef(false);
   // The problem the text was written for. Switching problems replaces the
@@ -91,7 +99,7 @@ const CollaborativeEditor = ({
   const seedStarterCode = (ydoc: Y.Doc) => {
     const starter = starterCodeRef.current;
     const ytext = ydoc.getText("code");
-    if (starter && !seededRef.current && ytext.length === 0) {
+    if (starter && writesStarterRef.current && !seededRef.current && ytext.length === 0) {
       seededRef.current = true;
       ytext.insert(0, starter);
     }
@@ -197,7 +205,7 @@ const CollaborativeEditor = ({
       return;
     }
     seedStarterCode(ydoc);
-  }, [problemId, starterCode, replacesOnProblemChange]);
+  }, [problemId, starterCode, replacesOnProblemChange, writesStarter]);
 
   // The roster decides colours, so a join or leave can recolour a cursor.
   useEffect(() => {
