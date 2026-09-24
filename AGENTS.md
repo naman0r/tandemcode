@@ -2,8 +2,17 @@
 
 ## Local checks
 
-- Backend: `cd apps/backend && docker compose up -d db && docker compose run --rm -v "$PWD:/workspace" backend sh -lc 'cd /workspace && HOME=/tmp pip install -r requirements-dev.txt && HOME=/tmp python -m pytest'`
-- Web: `cd apps/web && npm run lint && npm run build`
+- Everything CI runs: `make check`. `make` lists the other commands.
+- Backend only: `make test` (runs pytest in the API image against the compose database).
+- Web only: `make lint` (lint and production build).
+
+## Docs
+
+- Start at `docs/README.md`. `docs/architecture.md` says where each part of the system lives.
+- A change to how something works updates the page that describes it, in the same pull request.
+- Docs name the constant or file that holds a value; they do not copy the value.
+- `docs/decisions/` records are never edited. A changed decision gets a new record.
+- `docs/internal/` is gitignored and never committed.
 
 ## Content rules
 
