@@ -15,15 +15,27 @@ import Problems from "./routes/Problems.tsx";
 import About from "./routes/About.tsx";
 import { ClerkAuthBridge } from "./lib/auth.ts";
 import { UserBootstrap } from "./lib/UserBootstrap.tsx";
-import { initTheme } from "./lib/theme.ts";
-
-initTheme();
 
 const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 if (!PUBLISHABLE_KEY) {
   throw new Error("Add your Clerk Publishable Key to the .env file");
 }
+
+// Clerk's sign-in and account dialogs, in the site's colours.
+const CLERK_APPEARANCE = {
+  variables: {
+    colorPrimary: "#f97316",
+    colorTextOnPrimaryBackground: "#0a0a0b",
+    colorBackground: "#18181b",
+    colorText: "#f4f4f5",
+    colorTextSecondary: "#a1a1aa",
+    colorNeutral: "#f4f4f5",
+    colorInputBackground: "#09090b",
+    colorInputText: "#f4f4f5",
+    borderRadius: "0",
+  },
+};
 
 const router = createBrowserRouter([
   { path: "/", element: <App /> },
@@ -39,7 +51,7 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+    <ClerkProvider publishableKey={PUBLISHABLE_KEY} appearance={CLERK_APPEARANCE}>
       <ClerkAuthBridge />
       <UserBootstrap>
         <RouterProvider router={router} />

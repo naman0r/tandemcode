@@ -1,168 +1,171 @@
 import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
-import { ArrowRight, CheckCircle2, Code2, Github, History, Users, Zap } from "lucide-react";
-import { button, muted } from "../lib/ui";
+import { Github } from "lucide-react";
+import { PEOPLE, tokens, useDemo, type Demo, type Who } from "./heroDemo";
+import { Mascot, Sprite } from "./Pixel";
+import { button, eyebrow, heading, muted } from "../lib/ui";
 
-const FEATURES = [
-  { icon: Users, text: "Live cursors and chat" },
-  { icon: Code2, text: "One shared editor" },
-  { icon: CheckCircle2, text: "Hidden test verdicts" },
-  { icon: History, text: "Session replay" },
+const big = "px-6! py-3! text-2xl!";
+
+const STEPS = [
+  { sprite: "door", title: "Open a room", text: "Public for anyone to find, or unlisted and shared by link." },
+  { sprite: "link", title: "Bring a partner", text: "Send the invite. Ask for a partner and the room goes to the top of the list." },
+  { sprite: "check", title: "Run it together", text: "Your code runs against examples and hidden tests. You both see the verdict." },
+  { sprite: "replay", title: "Watch it back", text: "Every keystroke, message and run, replayed in order." },
 ];
 
-const primary =
-  "group inline-flex items-center gap-2 rounded-xl bg-orange-500 px-7 py-3.5 text-base font-semibold text-zinc-950 shadow-lg shadow-orange-500/20 transition-all hover:bg-orange-400 hover:shadow-xl hover:shadow-orange-500/30 hover:-translate-y-0.5";
+const KIND: Record<string, string> = {
+  kw: "text-violet-300",
+  fn: "text-amber-200",
+  name: "text-zinc-200",
+  plain: "text-zinc-400",
+};
 
-const Arrow = () => (
-  <ArrowRight className="h-5 w-5 transition-transform group-hover:translate-x-1" />
+const Caret = ({ who, blink }: { who: Who; blink: boolean }) => (
+  <span
+    className={`relative inline-block h-[1.15em] w-[2px] align-text-bottom ${blink ? "motion-safe:animate-pulse" : ""}`}
+    style={{ background: PEOPLE[who].color }}
+  >
+    <span
+      className="absolute -top-[1.1em] left-0 px-1 font-silk text-[9px] leading-[1.4] text-zinc-950"
+      style={{ background: PEOPLE[who].color }}
+    >
+      {PEOPLE[who].name}
+    </span>
+  </span>
 );
 
-const HeroSection = () => (
-  <div className="relative">
-    {/* Soft colour behind everything, so the page is not a flat sheet. Radial
-        gradients that reach transparent at their own edge: nothing here is
-        clipped, so there are no hard edges in either theme. */}
-    <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden>
-      <div className="absolute top-0 left-0 h-[36rem] w-[36rem] rounded-full bg-[radial-gradient(closest-side,rgba(249,115,22,0.16),transparent)] dark:bg-[radial-gradient(closest-side,rgba(249,115,22,0.28),transparent)]" />
-      <div className="absolute right-0 bottom-0 h-[36rem] w-[36rem] rounded-full bg-[radial-gradient(closest-side,rgba(30,58,138,0.25),transparent)] dark:bg-[radial-gradient(closest-side,rgba(37,99,235,0.3),transparent)]" />
-    </div>
-
-    <div className="grid items-center gap-16 py-16 lg:grid-cols-2 lg:py-28">
-      <div className="max-w-2xl">
-        <div className="mb-6 flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-2 rounded-full bg-orange-50 px-3 py-1 text-sm font-medium text-orange-700 dark:bg-orange-950 dark:text-orange-300">
-            <Zap className="h-4 w-4" />
-            Real-time collaboration
+const DemoCode = ({ demo }: { demo: Demo }) => (
+  <pre className="min-h-[15rem] overflow-hidden bg-zinc-950/60 px-4 pt-6 pb-4 font-mono text-[13px] leading-7">
+    {demo.lines.map((line, i) => {
+      const here = (Object.keys(demo.cursors) as Who[]).find((w) => demo.cursors[w]?.line === i);
+      return (
+        <div key={i} className="flex">
+          <span className="w-8 shrink-0 pr-4 text-right text-zinc-600 select-none">{i + 1}</span>
+          <span className="whitespace-pre">
+            {tokens(line).map((t, j) => (
+              <span key={j} className={KIND[t.kind]}>
+                {t.text}
+              </span>
+            ))}
+            {here && <Caret who={here} blink={demo.typing !== here} />}
           </span>
-          <a
-            href="https://github.com/naman0r/tandemcode"
-            className="inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3 py-1 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          >
-            <Github className="h-4 w-4" />
-            Free and open source
-          </a>
         </div>
+      );
+    })}
+  </pre>
+);
 
-        <h1 className="text-4xl font-bold leading-tight tracking-tight lg:text-6xl">
-          Code together,{" "}
-          <span className="text-orange-500 dark:text-orange-400">
-            learn faster
-          </span>
-        </h1>
-
-        <p className={`${muted} mt-6 text-xl leading-relaxed`}>
-          Open a room, invite a partner, and solve a problem in one shared editor.
-          Run against hidden tests, see the verdict together, and replay the whole
-          session afterwards.
-        </p>
-
-        <div className="mt-8 grid grid-cols-2 gap-4">
-          {FEATURES.map(({ icon: Icon, text }) => (
-            <div key={text} className="flex items-center gap-2 font-medium">
-              <Icon className="h-5 w-5 text-orange-500 dark:text-orange-400" />
-              {text}
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-10 flex flex-col gap-4 sm:flex-row">
-          <SignedOut>
-            <SignInButton mode="modal">
-              <button type="button" className={primary}>
-                Start coding together
-                <Arrow />
-              </button>
-            </SignInButton>
-            <Link to="/problems" className={`${button.secondary} rounded-xl px-7 py-3.5 text-base`}>
-              Browse problems
-            </Link>
-          </SignedOut>
-          <SignedIn>
-            <Link to="/rooms/create" className={primary}>
-              Create a room
-              <Arrow />
-            </Link>
-            <Link to="/dashboard" className={`${button.secondary} rounded-xl px-7 py-3.5 text-base`}>
-              Go to dashboard
-            </Link>
-          </SignedIn>
-        </div>
-
-        <div className="mt-12 flex items-center gap-8 border-t border-zinc-200 pt-8 dark:border-zinc-800">
-          <div>
-            <div className="text-2xl font-bold">Beta</div>
-            <div className={`${muted} text-sm`}>You are testing an early build</div>
+// A scripted session: two people type a solution, run it, and both see the verdict.
+const Workspace = () => {
+  const demo = useDemo();
+  return (
+    <div className="relative mx-auto mt-36 max-w-4xl text-left" aria-hidden>
+      <Mascot className="absolute -top-[8rem] left-10 h-40 w-40" />
+      <div className="px-box overflow-hidden bg-zinc-900 [--px:#3f3f46]">
+        <div className="flex items-center justify-between border-b-4 border-zinc-800 px-4 py-2.5">
+          <div className="flex items-center gap-3 font-pixel text-lg text-zinc-400">
+            <span className="text-zinc-100">two_sum.py</span>
+            <span className="hidden sm:inline">Python 3.11</span>
           </div>
-          <div>
-            <div className="text-2xl font-bold">15</div>
-            <div className={`${muted} text-sm`}>Problems with hidden tests</div>
-          </div>
-          <div>
-            <div className="text-2xl font-bold">Python</div>
-            <div className={`${muted} text-sm`}>3.11, more languages later</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="relative mx-6 lg:mr-8 lg:ml-8">
-        <div className="overflow-hidden rounded-2xl bg-zinc-900 shadow-2xl shadow-black/30 transition-transform duration-500 rotate-2 hover:rotate-0">
-          <div className="flex items-center justify-between bg-zinc-800 px-4 py-3">
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-red-500" />
-              <span className="h-3 w-3 rounded-full bg-yellow-500" />
-              <span className="h-3 w-3 rounded-full bg-green-500" />
-            </div>
-            <span className="font-mono text-sm text-zinc-400">two_sum.py</span>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="h-2 w-2 animate-pulse rounded-full bg-orange-400" />
-              <span className="text-orange-300">Alice</span>
-              <span className="h-2 w-2 animate-pulse rounded-full bg-sky-400" />
-              <span className="text-sky-300">Bob</span>
-            </div>
-          </div>
-
-          <pre className="p-6 font-mono text-sm leading-6 text-zinc-300">
-            <span className="text-zinc-500"># Two Sum</span>
-            {"\n"}
-            <span className="text-purple-400">for</span> <span className="text-orange-300">i</span>,{" "}
-            <span className="text-orange-300">n</span> <span className="text-purple-400">in</span>{" "}
-            <span className="text-blue-400">enumerate</span>(nums):
-            {"\n"}
-            {"    "}<span className="text-purple-400">if</span> target - n{" "}
-            <span className="text-purple-400">in</span> seen:
-            {"\n"}
-            {"        "}<span className="text-blue-400">print</span>(seen[target - n], i)
-            {"\n"}
-            {"        "}<span className="text-purple-400">break</span>
-            {"\n"}
-            {"    "}seen[n] = i
-            <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-orange-400 align-middle" />
-          </pre>
-
-          <div className="flex items-center gap-4 border-t border-zinc-700 bg-zinc-800 px-6 py-3 text-sm">
-            <span className="flex items-center gap-1.5 text-green-400">
-              <span className="h-2 w-2 rounded-full bg-green-500" />
-              5/5 tests passed
+          <div className="flex items-center gap-3 font-pixel text-lg">
+            <span className="flex items-center gap-1.5 text-orange-300">
+              <Sprite name="maya" size={18} /> maya
             </span>
-            <span className="text-zinc-400">14 ms</span>
+            <span className="flex items-center gap-1.5 text-sky-300">
+              <Sprite name="theo" size={18} /> theo
+            </span>
+            <span className={`ml-2 px-3 py-0.5 text-zinc-950 ${demo.phase === "running" ? "bg-orange-300" : "bg-orange-500"}`}>
+              {demo.phase === "running" ? "Running" : "Run"}
+            </span>
           </div>
         </div>
-
-        <div className="absolute -top-6 -right-6 rotate-12 rounded-lg bg-white p-3 shadow-lg transition-transform hover:rotate-6 dark:bg-zinc-800">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <Users className="h-4 w-4 text-orange-500 dark:text-orange-400" />
-            Live cursors
-          </div>
-        </div>
-        <div className="absolute -bottom-14 -left-6 -rotate-12 rounded-lg bg-white p-3 shadow-lg transition-transform hover:-rotate-6 dark:bg-zinc-800">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-            Verdicts for everyone
-          </div>
+        <DemoCode demo={demo} />
+        <div className="flex h-14 items-center gap-4 border-t-4 border-zinc-800 px-4 font-pixel text-xl">
+          {demo.phase === "typing" && <span className="text-zinc-500">Ready when you both are.</span>}
+          {demo.phase === "running" && (
+            <>
+              <span className="text-zinc-300">Judging</span>
+              <span className="flex gap-1">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <span key={i} className="h-3 w-3 animate-pulse bg-orange-400" style={{ animationDelay: `${i * 120}ms` }} />
+                ))}
+              </span>
+            </>
+          )}
+          {demo.phase === "accepted" && (
+            <>
+              <span className="text-4xl tracking-wide text-emerald-400">ACCEPTED</span>
+              <span className="text-zinc-400">5/5 tests, 14 ms</span>
+              <span className="ml-auto hidden items-center gap-2 text-lg text-zinc-500 sm:flex">
+                seen by <Sprite name="maya" size={18} /> <Sprite name="theo" size={18} />
+              </span>
+            </>
+          )}
         </div>
       </div>
     </div>
-  </div>
+  );
+};
+
+const HeroSection = () => (
+  <>
+    <section className="pt-12 pb-24 text-center sm:pt-20">
+      <a
+        href="https://github.com/naman0r/tandemcode"
+        className="px-box mb-8 inline-flex items-center gap-2 bg-zinc-900 px-3 py-1 font-pixel text-xl leading-none text-zinc-300 [--px:#3f3f46] hover:text-zinc-50 hover:[--px:#f97316]"
+      >
+        <Github className="h-4 w-4" />
+        Free and open source
+      </a>
+      <p className={eyebrow}>2 PLAYERS. 1 EDITOR.</p>
+      <h1 className="mt-5 font-pixel text-7xl leading-none sm:text-9xl">
+        Code it <span className="text-orange-500">together.</span>
+      </h1>
+      <p className={`${muted} mx-auto mt-6 max-w-xl text-lg`}>
+        A serious place to practice coding problems, made warmer by doing it with someone. One shared editor, one
+        judge, and a replay of the whole session.
+      </p>
+      <div className="mt-10 flex flex-col items-center justify-center gap-5 sm:flex-row">
+        <SignedOut>
+          <SignInButton mode="modal">
+            <button type="button" className={`${button.primary} ${big}`}>
+              Start a room
+            </button>
+          </SignInButton>
+          <Link to="/problems" className={`${button.secondary} ${big}`}>
+            Browse problems
+          </Link>
+        </SignedOut>
+        <SignedIn>
+          <Link to="/rooms/create" className={`${button.primary} ${big}`}>
+            Start a room
+          </Link>
+          <Link to="/dashboard" className={`${button.secondary} ${big}`}>
+            Go to dashboard
+          </Link>
+        </SignedIn>
+      </div>
+
+      <Workspace />
+    </section>
+
+    <section className="pb-20">
+      <h2 className={`${heading} text-center text-5xl!`}>How a session goes</h2>
+      <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+        {STEPS.map((step, i) => (
+          <div key={step.title} className="px-box bg-zinc-900 p-5 [--px:#27272a]">
+            <div className="flex items-center justify-between">
+              <Sprite name={step.sprite} size={40} />
+              <span className="font-silk text-xs text-zinc-600">0{i + 1}</span>
+            </div>
+            <h3 className={`${heading} mt-4`}>{step.title}</h3>
+            <p className={`${muted} mt-2 text-sm leading-relaxed`}>{step.text}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  </>
 );
 
 export default HeroSection;

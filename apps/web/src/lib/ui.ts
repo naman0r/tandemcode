@@ -1,33 +1,50 @@
 // One vocabulary of classes so every page looks like the same product.
 
-export const card =
-  "rounded-xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900";
+export const card = "px-box bg-zinc-900 [--px:#27272a]";
 
 export const input =
-  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/30 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100";
+  "w-full border-2 border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-orange-500 focus:outline-none disabled:opacity-60";
 
 const buttonBase =
-  "inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/50 disabled:cursor-not-allowed disabled:opacity-50";
+  "px-box inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap px-4 py-1.5 font-pixel text-xl leading-none transition-transform focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-6 focus-visible:outline-orange-400 enabled:active:translate-y-px disabled:cursor-not-allowed disabled:opacity-50";
 
 export const button = {
-  primary: `${buttonBase} bg-orange-500 text-zinc-950 hover:bg-orange-400`,
-  secondary: `${buttonBase} border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:hover:bg-zinc-800`,
-  danger: `${buttonBase} border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-900 dark:bg-red-950 dark:text-red-300 dark:hover:bg-red-900`,
+  primary: `${buttonBase} bg-orange-500 text-zinc-950 [--px-shade:rgba(0,0,0,0.25)] [--px:#0a0a0b] hover:bg-orange-400`,
+  secondary: `${buttonBase} bg-zinc-900 text-zinc-100 [--px:#3f3f46] hover:bg-zinc-800`,
+  danger: `${buttonBase} bg-red-950 text-red-300 [--px:#7f1d1d] hover:bg-red-900`,
   // A toggle that is on.
-  active: `${buttonBase} border border-orange-300 bg-orange-50 text-orange-700 hover:bg-orange-100 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-300 dark:hover:bg-orange-900`,
-  ghost: `${buttonBase} text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100`,
+  active: `${buttonBase} bg-orange-950 text-orange-300 [--px:#c2410c] hover:bg-orange-900`,
+  ghost:
+    "inline-flex shrink-0 items-center justify-center gap-2 px-3 py-1.5 font-pixel text-xl leading-none text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-zinc-100 focus:outline-none focus-visible:outline-2 focus-visible:outline-orange-400",
 };
 
-export const muted = "text-zinc-500 dark:text-zinc-400";
+export const muted = "text-zinc-400";
+
+// Page and section headings, in the pixel face.
+export const title = "font-pixel text-5xl leading-none text-zinc-50";
+export const heading = "font-pixel text-3xl leading-none";
+
+// Small caps label above a heading.
+export const eyebrow = "font-silk text-xs tracking-[0.2em] text-zinc-500";
 
 export const difficulty: Record<string, string> = {
-  easy: "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-900",
-  medium:
-    "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-300 dark:border-amber-900",
-  hard: "bg-red-50 text-red-700 border-red-200 dark:bg-red-950 dark:text-red-300 dark:border-red-900",
+  easy: "border-emerald-800 bg-emerald-950 text-emerald-300",
+  medium: "border-amber-800 bg-amber-950 text-amber-300",
+  hard: "border-red-800 bg-red-950 text-red-300",
 };
 
 export const badge = (tone: string | undefined) =>
-  `inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize ${
-    tone ?? "border-zinc-200 bg-zinc-50 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+  `inline-flex items-center border-2 px-1.5 pt-px font-pixel text-lg leading-tight capitalize ${
+    tone ?? "border-zinc-700 bg-zinc-800 text-zinc-300"
   }`;
+
+// You are orange. Everyone else takes the next colour in the order they
+// joined, so a pair is always orange and blue on both screens.
+const YOU = "#f97316";
+const OTHERS = ["#0ea5e9", "#a855f7", "#22c55e", "#eab308", "#ec4899", "#14b8a6"];
+
+export const personColor = (userId: string, selfId: string | undefined, roster: string[]): string => {
+  if (userId === selfId) return YOU;
+  const index = roster.filter((id) => id !== selfId).indexOf(userId);
+  return OTHERS[Math.max(0, index) % OTHERS.length];
+};
