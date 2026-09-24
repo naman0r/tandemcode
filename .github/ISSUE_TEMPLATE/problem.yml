@@ -1,0 +1,31 @@
+name: Problem proposal
+description: Suggest a practice problem. If you can write it yourself, CONTRIBUTING.md shows how.
+labels: [problem]
+body:
+  - type: input
+    id: title
+    attributes:
+      label: Problem
+      placeholder: Move Zeroes
+    validations:
+      required: true
+  - type: textarea
+    id: statement
+    attributes:
+      label: Statement
+      description: The task in your own words, with one example input and output. Do not paste text from other sites.
+    validations:
+      required: true
+  - type: dropdown
+    id: difficulty
+    attributes:
+      label: Difficulty
+      options: [easy, medium, hard]
+    validations:
+      required: true
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Contribution
+      options:
+        - label: I would like to open the pull request for this myself.

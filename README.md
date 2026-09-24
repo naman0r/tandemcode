@@ -1,136 +1,72 @@
-# TandemCode
+<p align="center">
+  <a href="https://tandemcode.space">
+    <img src="docs/assets/logo.png" width="96" height="96" alt="TandemCode logo">
+  </a>
+</p>
 
-Real-time pair programming with a judge. Two people share a room, edit the same
-code in a Monaco editor, chat, pick a problem, and run their solution against
-hidden tests.
+<h1 align="center">TandemCode</h1>
 
-## What works today
+<p align="center">
+  <strong>Practice coding problems with a partner.</strong><br>
+  One shared editor, one judge, and a replay of the whole session.
+</p>
 
-- Clerk sign-in. Every API route and both websockets verify a session token.
-- Rooms: create, join by id, presence, chat, owner assigns a problem.
-- Shared editor: Yjs over a websocket relay, one document per room.
-- Problems: statement, starter code, public samples, hidden tests, for all
-  fifteen seeded problems.
-- Run: a runner process judges Python submissions against the tests with time
-  and memory limits and the room shows the verdict and the first failing test.
+<p align="center">
+  <a href="https://tandemcode.space"><strong>tandemcode.space</strong></a>
+  &nbsp;&middot;&nbsp;
+  <a href="docs/README.md">Docs</a>
+  &nbsp;&middot;&nbsp;
+  <a href="CONTRIBUTING.md">Add a problem</a>
+</p>
 
-## What does not exist yet
+<p align="center">
+  <a href="https://tandemcode.space"><img src="https://img.shields.io/website?url=https%3A%2F%2Ftandemcode.space&label=site&up_message=online&down_message=offline" alt="Site status"></a>
+  <a href="https://api.tandemcode.space/health"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.tandemcode.space%2Fhealth&query=%24.status&label=api&color=brightgreen" alt="API status"></a>
+  <a href="https://github.com/naman0r/tandemcode/deployments"><img src="https://img.shields.io/github/deployments/naman0r/tandemcode/Production?label=vercel&logo=vercel" alt="Vercel deployment"></a>
+  <a href="https://github.com/naman0r/tandemcode/actions/workflows/backend-tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/naman0r/tandemcode/backend-tests.yml?branch=main&label=backend%20tests&logo=github" alt="Backend tests"></a>
+  <a href="https://github.com/naman0r/tandemcode/actions/workflows/web-checks.yml"><img src="https://img.shields.io/github/actions/workflow/status/naman0r/tandemcode/web-checks.yml?branch=main&label=web%20checks&logo=github" alt="Web checks"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/naman0r/tandemcode" alt="License"></a>
+</p>
 
-- A queue or separate judge hosts. The runner takes work from the submissions
-  table on the API host. See #33.
-- Complexity estimates, counterexamples, languages other than Python.
+Two people share a room, edit the same code with live cursors, chat, and run their solution against the problem's tests together. Everyone in the room sees the verdict, and the session can be replayed afterwards. TandemCode is free and open source under the Apache License 2.0.
 
-## Stack
+## What it does
 
-| Piece | Choice |
-| --- | --- |
-| Web | React 19, Vite, TypeScript, Tailwind, Monaco, Yjs, Clerk |
-| API | FastAPI on Python 3.11, asyncpg, raw JSON over websockets |
-| Runner | Same image as the API, `python -m app.runner` |
-| Database | Postgres 17 in production and CI (13 in the local compose), forward-only SQL migrations in `apps/backend/migrations` |
-| CI | pytest with a Postgres service; web lint and build |
-
-## Layout
-
-```
-apps/
-  backend/
-    app/
-      core/        settings, Clerk token verification
-      routes/      HTTP endpoints
-      services/    rules, take an authenticated caller id
-      dao/         all SQL
-      websocket/   room chat and Yjs relay
-      runner/      judge and the polling worker
-    migrations/    V<n>__<name>.sql
-    tests/
-  web/
-    src/
-      routes/      pages: /, /dashboard, /rooms, /rooms/create, /rooms/join, /rooms/:id, /problems
-      components/  editor, chat, members, header
-      hooks/       room websocket
-      lib/         API client, auth, config
-infra/             production compose, Caddy, host scripts
-```
-
-Requests flow routes to services to dao. Authentication happens at the HTTP
-and websocket boundary; services never see a token.
+- Rooms that are public or unlisted, shared by invite link, with a way to ask for a partner.
+- One shared editor with live cursors, built on Yjs.
+- Problems with starter code, visible examples and hidden tests, added by pull request.
+- Python submissions judged in an isolated container per run, with the verdict shown to everyone in the room.
+- A replay of each session: the code as it was typed, the chat and every run.
 
 ## Run it locally
 
-You need Docker, Node 20.19 or later, and a Clerk application.
+You need Docker, Node 22 and a free Clerk application.
 
 ```bash
-cd apps/backend
-cp .env.example .env         # set DB_PASSWORD, CLERK_ISSUER, CLERK_SECRET_KEY
-docker compose up -d --build # db on 5433, api on 8080, runner
-
-cd ../web
-cp .env.template .env        # set VITE_CLERK_PUBLISHABLE_KEY
-npm install
-npm run dev                  # http://localhost:5173
+make setup    # copy the .env templates, install web dependencies
+              # then fill in the Clerk keys and a DB password
+make up       # Postgres, the API and the runner
+make web      # http://localhost:5173
 ```
 
-Migrations run when the API starts. The runner waits for the API's health
-check, so it never sees a half-migrated schema.
+[docs/development.md](docs/development.md) has the details, the checks and the common changes.
 
-To serve the built web app from nginx instead of Vite, add
-`VITE_CLERK_PUBLISHABLE_KEY` to apps/backend/.env and run
-`docker compose --profile prod up -d --build`. The app is on port 3000.
+## Stack
 
-To run the API outside Docker instead:
+- Web: React 19, Vite, TypeScript, Tailwind, Monaco, Yjs, Clerk.
+- API: FastAPI on Python 3.11 with asyncpg, HTTP plus two websockets.
+- Runner: the API's image running `python -m app.runner`, judging in Docker containers under gVisor.
+- Database: Postgres 17 with forward-only SQL migrations.
+- Production: one Linux host with Docker Compose and Caddy, and the web app on Vercel.
 
-```bash
-cd apps/backend
-python3.11 -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/uvicorn app.main:app --port 8080 --reload
-.venv/bin/python -m app.runner
-```
+## Docs
 
-## Checks
-
-```bash
-cd apps/backend && docker compose run --rm -v "$PWD:/workspace" backend \
-  sh -lc 'cd /workspace && HOME=/tmp pip install -r requirements-dev.txt && HOME=/tmp python -m pytest'
-cd apps/web && npm run lint && npm run build
-```
-
-Tests use a `tandemcode_test` database that is dropped and recreated per run.
-
-## Judge contract
-
-A problem's tests are `[{"input", "expected", "hidden"}]`. The program reads
-stdin and prints; a test passes when trimmed stdout equals the trimmed
-expected string. The runner stops at the first failure. Statuses are
-`accepted`, `wrong_answer`, `runtime_error` and `time_limit_exceeded`. The
-judge is a pure function in `apps/backend/app/runner/judge.py`, so a hosted
-runner can call the same thing.
-
-## Sandbox
-
-With `SANDBOX_IMAGE` set, as it is in docker compose, the runner judges each
-submission in a fresh container from that image: no network, read-only root,
-a 64 MB `/tmp`, uid 65534, all capabilities dropped, a memory cap and 32
-processes. Without it the runner refuses to start, unless `ALLOW_UNSANDBOXED=1`
-is set, in which case it judges in-process with rlimits only: fine for tests,
-not for strangers' code. Output of hidden tests is never returned.
-
-Containers share the host kernel, so one kernel bug is enough to escape them.
-With `SANDBOX_RUNTIME=runsc` each judge container runs under gVisor, which
-handles the program's system calls in its own user-space kernel; production
-sets it, and `infra/install-gvisor.sh` installs it on an Ubuntu host.
-
-The runner reaches Docker through the host's socket, so the runner itself is
-as trusted as the host. Keep it on a machine that runs nothing else.
-
-## Deploy
-
-`infra/` runs the API, runner, Postgres and Caddy on one Docker host with
-`docker compose -f infra/docker-compose.prod.yml up -d --build`; settings go in
-`infra/.env` (see `infra/.env.example`). The web app is a static Vite build,
-with `apps/web/vercel.json` for Vercel.
+- [Development](docs/development.md)
+- [Architecture](docs/architecture.md)
+- [Judge and sandbox](docs/judge-and-sandbox.md)
+- [Self-hosting](docs/self-hosting.md)
+- [Decisions](docs/decisions/)
 
 ## Contributing
 
-`CONTRIBUTING.md` covers pull requests and how to add a problem. `AGENTS.md`
-has the rules for agents and the same checks as above.
+Pull requests are welcome, and adding a problem is the easiest place to start. [CONTRIBUTING.md](CONTRIBUTING.md) explains both. Report security issues privately as described in [SECURITY.md](SECURITY.md).

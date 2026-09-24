@@ -1,0 +1,27 @@
+# Monthly and grouped, so updates arrive as one pull request per ecosystem.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule:
+      interval: monthly
+    groups:
+      web:
+        patterns: ["*"]
+    ignore:
+      # Pinned on purpose. Upgrade it by hand and check the shared editor.
+      - dependency-name: monaco-editor
+  - package-ecosystem: pip
+    directory: /apps/backend
+    schedule:
+      interval: monthly
+    groups:
+      backend:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ["*"]

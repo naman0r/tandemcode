@@ -1,7 +1,9 @@
 # Contributing
 
-Pull requests are welcome. `README.md` explains how to run the app locally and
-which checks CI runs; run those before opening a pull request.
+Pull requests are welcome. [docs/development.md](docs/development.md) explains
+how to run the app locally and make common changes. Run `make check`, which is
+what CI runs, before opening a pull request. For anything larger than a small
+fix, open an issue first so we can agree on the approach.
 
 ## Adding a problem
 
@@ -125,7 +127,7 @@ in your migration, hidden ones included. It fails if:
 
 ### 5. Check it
 
-Run the backend checks from `README.md`. To see the problem in the app,
+Run `make test`. To see the problem in the app,
 restart the API so the migration runs:
 
 ```bash

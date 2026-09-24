@@ -2,7 +2,8 @@
 # ${VAR:?...} makes Compose fail loudly instead of substituting an empty string.
 services:
   db:
-    image: postgres:13
+    # The same major version as production and CI.
+    image: postgres:17
     container_name: tandemcode-db
     environment:
       POSTGRES_DB: ${DB_NAME:?missing DB_NAME - copy .env.example to .env}
@@ -100,4 +101,7 @@ services:
 
 volumes:
   db-data:
-    name: tandemcode-db-data
+    # Postgres cannot open another major version's data files, so the volume
+    # is named for the version. An old tandemcode-db-data volume is unused and
+    # can be removed with `docker volume rm tandemcode-db-data`.
+    name: tandemcode-db-data-17
