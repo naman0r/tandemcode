@@ -22,6 +22,9 @@ logger = logging.getLogger(__name__)
 # slow network, not a peer that has stopped reading.
 SEND_TIMEOUT_SECONDS = 5.0
 
+# The event loop holds tasks weakly; these are kept until they finish.
+_closing: set[asyncio.Task] = set()
+
 
 async def fan_out(
     sockets: Iterable[WebSocket],
@@ -41,13 +44,25 @@ async def fan_out(
                 return
             stalled.add(websocket)
             logger.warning("Dropping a socket that did not take a frame")
-            with contextlib.suppress(Exception):
-                await asyncio.wait_for(
-                    websocket.close(code=status.WS_1011_INTERNAL_ERROR), SEND_TIMEOUT_SECONDS
-                )
+            # Not awaited: the close frame queues behind the same stuck writer,
+            # so waiting for it would hold this broadcast a second deadline.
+            task = asyncio.create_task(_close(websocket, status.WS_1011_INTERNAL_ERROR))
+            _closing.add(task)
+            task.add_done_callback(_closing.discard)
         except Exception:
             # A socket that is closing, or joined but not yet accepted, raises
             # here. Its own handler cleans it up; it is not stalled.
             logger.debug("Send to a socket failed", exc_info=True)
 
     await asyncio.gather(*(one(websocket) for websocket in sockets if websocket not in stalled))
+
+
+async def close_all(sockets: Iterable[WebSocket], code: int = status.WS_1000_NORMAL_CLOSURE) -> None:
+    """Close side by side, each with a deadline, so one stuck peer holds no one up."""
+    await asyncio.gather(*(_close(websocket, code) for websocket in sockets))
+
+
+async def _close(websocket: WebSocket, code: int) -> None:
+    # A peer that dropped a moment ago must not stop the rest being closed.
+    with contextlib.suppress(Exception):
+        await asyncio.wait_for(websocket.close(code=code), SEND_TIMEOUT_SECONDS)

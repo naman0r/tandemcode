@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import time
 from collections import defaultdict, deque
 
@@ -8,37 +7,50 @@ from fastapi import WebSocket, WebSocketException, status
 
 from app.dao.room_members import RoomMemberDAO
 from app.dao.room_updates import RoomUpdateDAO
-from app.websocket.fanout import fan_out
+from app.websocket.fanout import close_all, fan_out
 from app.websocket.room_chat import MAX_SOCKETS_PER_USER, MAX_SOCKETS_PER_USER_TOTAL
 
 # y-websocket clients open with SyncStep1 and only consider themselves synced
 # once a SyncStep2 comes back. A peer answers that when there is one; when the
 # client is alone, nobody would, so the relay answers for the empty document
-# it does not keep. Both are the messageSync envelope followed by the step.
-SYNC_STEP1_PREFIX = b"\x00\x00"
+# it does not keep.
 EMPTY_SYNC_STEP2 = b"\x00\x01\x02\x00\x00"
 
-# SyncStep2 and Update both carry document changes; those are what a replay
-# needs. SyncStep1 is a request and awareness (message type 1) is cursors.
-DOCUMENT_CHANGE_PREFIXES = (b"\x00\x01", b"\x00\x02")
+# The two messages an editor sends: sync (type 0) and awareness (type 1,
+# cursors). A sync message is SyncStep1, a request for the peer's document;
+# SyncStep2, the reply; or an Update. The last two are what a replay needs.
+SYNC_STEP1, SYNC_STEP2, SYNC_UPDATE, AWARENESS = "step1", "step2", "update", "awareness"
 
 # A full sync of a long solution is tens of kilobytes. Anything near this is
 # not an editor and every frame is stored, so the socket is closed instead.
 MAX_FRAME_BYTES = 256 * 1024
+# A cursor is a name, a colour and a selection: about a hundred bytes.
+MAX_AWARENESS_BYTES = 16 * 1024
 
 # A long session stores well under a megabyte. Past this a room keeps relaying
 # but stops recording, so no one socket can fill the disk, and a replay stays
 # small enough to send in one response.
 MAX_RECORDED_BYTES_PER_ROOM = 4 * 1024 * 1024
+# Each stored frame is charged at least this, so the budget also caps the row
+# count. Charged by size alone, a stream of tiny frames would fill a room with
+# a million rows that a replay then has to load. A keystroke is some 30 bytes,
+# so this still leaves room for over 30,000 of them.
+MIN_RECORDED_FRAME_BYTES = 128
 
-# Each keystroke is an edit and a cursor move, so a held key auto-repeating
-# is some 60 frames a second. A socket past that for ten seconds is a script,
-# and it is closed; y-websocket reconnects and resyncs.
-FRAME_BURST = 600
+# Each keystroke is an edit and a cursor move, and a drag-select sends a cursor
+# on every mouse move, some 120 a second on a fast mouse. A socket past this
+# for ten seconds is a script, and it is closed; y-websocket reconnects and
+# resyncs.
+FRAME_BURST = 2000
 FRAME_WINDOW_SECONDS = 10.0
+# Every frame goes out to every peer, so bytes are budgeted too. Typing is a
+# few kilobytes a second; the burst covers a full sync or a large paste.
+BYTE_BURST = 1024 * 1024
+BYTES_PER_SECOND = 64 * 1024
 # SyncStep1 asks every peer for its whole document, so it is sent on connect
-# and not again. A handful covers reconnects; a flood would replay documents.
-SYNC_REQUEST_BURST = 5
+# and not again. Counted per user, not per socket, so reconnecting does not
+# reset it; a few tabs and reconnects fit, a flood would replay documents.
+SYNC_REQUEST_BURST = 10
 SYNC_REQUEST_WINDOW_SECONDS = 60.0
 
 
@@ -55,20 +67,31 @@ def _read_varuint(data: bytes, offset: int) -> tuple[int, int] | None:
     return None
 
 
-def is_well_framed_sync(payload: bytes) -> bool:
-    """A sync message: type 0, step 0 to 2, then one length-prefixed body.
+def classify(payload: bytes) -> str | None:
+    """Which editor message this is, or None for anything else.
 
-    This checks the envelope, not the Yjs update inside it, which is enough
-    to refuse bytes that merely start like a sync message.
+    Decoded rather than matched on raw bytes: lib0 reads padded varuints, so
+    `80 00` is a sync message to every client even though it does not start
+    with a zero byte. A sync message must be type 0, step 0 to 2, then one
+    non-empty length-prefixed body; even an empty document's body is a byte.
+    This checks the envelope, not the Yjs data inside it.
     """
-    offset = 0
-    for allowed in ({0}, {0, 1, 2}):
-        read = _read_varuint(payload, offset)
-        if read is None or read[0] not in allowed:
-            return False
-        offset = read[1]
+    read = _read_varuint(payload, 0)
+    if read is None:
+        return None
+    kind, offset = read
+    if kind == 1:
+        return AWARENESS
+    if kind != 0:
+        return None
     read = _read_varuint(payload, offset)
-    return read is not None and read[1] + read[0] == len(payload)
+    if read is None or read[0] > 2:
+        return None
+    step, offset = read
+    read = _read_varuint(payload, offset)
+    if read is None or read[0] == 0 or read[1] + read[0] != len(payload):
+        return None
+    return (SYNC_STEP1, SYNC_STEP2, SYNC_UPDATE)[step]
 
 
 class YjsRelayManager:
@@ -79,7 +102,10 @@ class YjsRelayManager:
         # Sockets that stopped taking frames; skipped until they disconnect.
         self.stalled: set[WebSocket] = set()
         self.frames: dict[WebSocket, deque[float]] = defaultdict(deque)
-        self.sync_requests: dict[WebSocket, deque[float]] = defaultdict(deque)
+        # Remaining bytes and when they were last topped up.
+        self.byte_budgets: dict[WebSocket, tuple[float, float]] = {}
+        # ponytail: never pruned, one small deque per user who ever edited.
+        self.sync_requests: dict[str, deque[float]] = defaultdict(deque)
 
     async def connect(
         self, websocket: WebSocket, room_id: str, user_id: str, room_member_dao: RoomMemberDAO
@@ -103,7 +129,7 @@ class YjsRelayManager:
     def disconnect(self, websocket: WebSocket, room_id: str) -> None:
         self.stalled.discard(websocket)
         self.frames.pop(websocket, None)
-        self.sync_requests.pop(websocket, None)
+        self.byte_budgets.pop(websocket, None)
         sessions = self.room_sessions.get(room_id)
         if not sessions:
             return
@@ -112,49 +138,58 @@ class YjsRelayManager:
             self.room_sessions.pop(room_id, None)
 
     async def close_user(self, room_id: str, user_id: str) -> None:
-        for websocket, owner in list(self.room_sessions.get(room_id, {}).items()):
-            if owner == user_id:
-                await self._close(websocket, room_id)
+        sessions = self.room_sessions.get(room_id, {})
+        await self._close([websocket for websocket, owner in sessions.items() if owner == user_id], room_id)
 
     async def close_room(self, room_id: str) -> None:
-        for websocket in list(self.room_sessions.get(room_id, {})):
-            await self._close(websocket, room_id)
+        await self._close(list(self.room_sessions.get(room_id, {})), room_id)
 
-    async def _close(self, websocket: WebSocket, room_id: str) -> None:
-        self.disconnect(websocket, room_id)
-        # A peer that dropped a moment ago must not stop the rest being closed.
-        with contextlib.suppress(Exception):
-            await websocket.close(code=status.WS_1000_NORMAL_CLOSURE)
+    async def _close(self, websockets: list[WebSocket], room_id: str) -> None:
+        for websocket in websockets:
+            self.disconnect(websocket, room_id)
+        await close_all(websockets)
 
     def _peers(self, room_id: str, sender: WebSocket) -> list[WebSocket]:
         return [session for session in self.room_sessions.get(room_id, {}) if session is not sender]
 
-    async def relay_text(self, room_id: str, sender: WebSocket, message: str) -> None:
-        if not _within(self.frames[sender], FRAME_BURST, FRAME_WINDOW_SECONDS):
-            raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Too many frames")
-        await fan_out(self._peers(room_id, sender), lambda session: session.send_text(message), self.stalled)
-
     async def relay_bytes(self, room_id: str, sender: WebSocket, payload: bytes) -> None:
+        sessions = self.room_sessions.get(room_id, {})
+        user_id = sessions.get(sender)
+        if user_id is None:
+            # Closed by a leave while this frame was on its way.
+            return
         if len(payload) > MAX_FRAME_BYTES:
             raise WebSocketException(code=status.WS_1009_MESSAGE_TOO_BIG, reason="Frame too large")
-        if not _within(self.frames[sender], FRAME_BURST, FRAME_WINDOW_SECONDS):
+        if not _within(self.frames[sender], FRAME_BURST, FRAME_WINDOW_SECONDS) or not self._spend(
+            sender, len(payload)
+        ):
             raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Too many frames")
-        if payload.startswith(b"\x00"):
-            # Relayed to every peer and stored for replay, so it has to be one.
-            if not is_well_framed_sync(payload):
-                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA, reason="Malformed sync message")
-            if payload.startswith(SYNC_STEP1_PREFIX) and not _within(
-                self.sync_requests[sender], SYNC_REQUEST_BURST, SYNC_REQUEST_WINDOW_SECONDS
-            ):
+        # Relayed to every peer and stored for replay, so it has to be one of
+        # the messages an editor sends.
+        kind = classify(payload)
+        if kind is None:
+            raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA, reason="Malformed message")
+        if kind == AWARENESS and len(payload) > MAX_AWARENESS_BYTES:
+            raise WebSocketException(code=status.WS_1009_MESSAGE_TOO_BIG, reason="Frame too large")
+        if kind == SYNC_STEP1:
+            if not _within(self.sync_requests[user_id], SYNC_REQUEST_BURST, SYNC_REQUEST_WINDOW_SECONDS):
                 raise WebSocketException(code=status.WS_1008_POLICY_VIOLATION, reason="Too many sync requests")
-        sessions = list(self.room_sessions.get(room_id, {}))
-        if sessions == [sender] and payload.startswith(SYNC_STEP1_PREFIX):
-            await sender.send_bytes(EMPTY_SYNC_STEP2)
-            return
+            if list(sessions) == [sender]:
+                await sender.send_bytes(EMPTY_SYNC_STEP2)
+                return
         await fan_out(self._peers(room_id, sender), lambda session: session.send_bytes(payload), self.stalled)
         # After the relay so a slow disk never delays a keystroke reaching a peer.
-        if payload.startswith(DOCUMENT_CHANGE_PREFIXES):
-            await self.updates.record(room_id, payload, MAX_RECORDED_BYTES_PER_ROOM)
+        if kind in (SYNC_STEP2, SYNC_UPDATE):
+            await self.updates.record(room_id, payload, MAX_RECORDED_BYTES_PER_ROOM, MIN_RECORDED_FRAME_BYTES)
+
+    def _spend(self, websocket: WebSocket, size: int) -> bool:
+        now = time.monotonic()
+        remaining, topped_up = self.byte_budgets.get(websocket, (BYTE_BURST, now))
+        remaining = min(BYTE_BURST, remaining + (now - topped_up) * BYTES_PER_SECOND) - size
+        if remaining < 0:
+            return False
+        self.byte_budgets[websocket] = (remaining, now)
+        return True
 
 
 def _within(sent: deque[float], burst: int, window: float) -> bool:
