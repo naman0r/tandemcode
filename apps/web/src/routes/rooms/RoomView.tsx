@@ -286,7 +286,7 @@ const Room = ({ roomId }: { roomId: string }) => {
   const [runError, setRunError] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
 
-  const { isConnected, connectionState, messages, members, submissions, seedSubmissions, sendMessage } =
+  const { isConnected, connectionState, messages, members, submissions, problemChange, seedSubmissions, sendMessage } =
     useWebSocket(room?.id ?? "");
   const isOwner = room?.createdBy === user?.id;
   // Explicit selection wins; otherwise the newest run is what the room is looking at.
@@ -302,6 +302,16 @@ const Room = ({ roomId }: { roomId: string }) => {
       .catch(() => setRoom(null))
       .finally(() => setLoading(false));
   }, [roomId]);
+
+  useEffect(() => {
+    if (problemChange) setRoom((prev) => prev && { ...prev, currentProblemId: problemChange.problemId });
+  }, [problemChange]);
+
+  // A change made while the socket was down never arrives on it.
+  useEffect(() => {
+    if (!isConnected) return;
+    roomApi.getRoom(roomId).then(setRoom).catch(() => {});
+  }, [roomId, isConnected]);
 
   useEffect(() => {
     if (!room?.currentProblemId) {

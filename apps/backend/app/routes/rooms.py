@@ -92,11 +92,18 @@ async def leave_room(
 async def set_current_problem(
     room_id: str,
     payload: SetProblemRequest,
+    request: Request,
     caller_id: str = Depends(current_user_id),
     service: RoomService = Depends(get_room_service),
 ) -> RoomResponse:
-    room = await service.set_current_problem(room_id, payload.problemId, caller_id)
-    return RoomResponse.model_validate(room)
+    room = RoomResponse.model_validate(
+        await service.set_current_problem(room_id, payload.problemId, caller_id)
+    )
+    # The shared editor switches for everyone; the statement beside it must too.
+    await request.app.state.room_chat_manager.broadcast(
+        room_id, {"type": "problem", "problemId": room.currentProblemId}
+    )
+    return room
 
 
 @router.put("/{room_id}/listing", response_model=RoomResponse)
