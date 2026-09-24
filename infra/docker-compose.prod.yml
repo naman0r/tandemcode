@@ -41,12 +41,14 @@ services:
     build: ../apps/backend
     # Behind Caddy, the only way in: trust its X-Forwarded-For so logs show
     # the caller, and cap open connections so a flood cannot exhaust the box.
+    # A websocket message is read whole before the app sees it, so the cap is
+    # the editor relay's largest frame.
     command:
       - uvicorn
       - app.main:app
       - --host=0.0.0.0
       - --port=8080
-      - --ws-max-size=1048576
+      - --ws-max-size=262144
       - --forwarded-allow-ips=*
       - --limit-concurrency=1000
     networks: [internal, default]
@@ -60,6 +62,9 @@ services:
       CLERK_ISSUER: ${CLERK_ISSUER:?missing CLERK_ISSUER}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY:?missing CLERK_SECRET_KEY}
       RUN_MIGRATIONS_ON_STARTUP: "true"
+    # Whatever goes wrong in the API, it is restarted before it can take
+    # Postgres and the runner down with it.
+    mem_limit: 768m
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
       interval: 10s

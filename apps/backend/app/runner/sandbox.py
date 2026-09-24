@@ -35,7 +35,9 @@ SANDBOX_RUNTIME = os.getenv("SANDBOX_RUNTIME")
 
 
 def pull(image: str) -> None:
-    subprocess.run(["docker", "pull", "--quiet", image], check=True, capture_output=True)
+    # Bounded like every docker call here: a hung daemon should fail loudly
+    # rather than leave the runner waiting forever with runs piling up.
+    subprocess.run(["docker", "pull", "--quiet", image], check=True, capture_output=True, timeout=600)
 
 
 def judge_in_container(
@@ -72,7 +74,7 @@ def judge_in_container(
     except subprocess.TimeoutExpired:
         # The judge inside enforces per-test limits; reaching this means the
         # container itself hung. Make sure it is gone.
-        subprocess.run(["docker", "rm", "--force", name], capture_output=True)
+        subprocess.run(["docker", "rm", "--force", name], capture_output=True, timeout=60)
         logger.error("Sandbox %s exceeded %.0fs and was removed", name, timeout)
         return Verdict(status=RUNTIME_ERROR, timeMs=0, passed=0, total=len(tests))
 
