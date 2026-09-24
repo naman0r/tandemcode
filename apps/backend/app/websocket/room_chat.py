@@ -12,7 +12,7 @@ from fastapi.encoders import jsonable_encoder
 from app.dao.events import EventDAO
 from app.dao.room_members import RoomMemberDAO
 from app.websocket.auth import Participant
-from app.websocket.fanout import fan_out
+from app.websocket.fanout import close_all, fan_out
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +176,7 @@ class RoomChatManager:
 
         for websocket in sessions:
             self._forget(websocket, room_id)
-            await websocket.close(code=status.WS_1000_NORMAL_CLOSURE)
+        await close_all(sessions)
 
         await self._broadcast_presence(room_id, room_member_dao)
 

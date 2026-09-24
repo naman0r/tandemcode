@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, Depends, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, FastAPI, WebSocket, WebSocketDisconnect, WebSocketException, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core import logging as access_logging
@@ -34,6 +35,9 @@ async def lifespan(app: FastAPI):
     app.state.db_pool = await create_pool()
     app.state.room_chat_manager = RoomChatManager(EventDAO(app.state.db_pool))
     app.state.yjs_relay_manager = YjsRelayManager(RoomUpdateDAO(app.state.db_pool))
+    # A full replay is tens of megabytes in memory while it is built; a few at
+    # a time keeps a burst of requests from taking the API down.
+    app.state.replay_slots = asyncio.Semaphore(2)
     verdicts = app.state.verdict_listener = VerdictListener(app.state.db_pool, app.state.room_chat_manager)
     await verdicts.start()
     try:
@@ -112,7 +116,8 @@ async def yjs_websocket(
             if message.get("bytes") is not None:
                 await manager.relay_bytes(room_id, websocket, message["bytes"])
             elif message.get("text") is not None:
-                await manager.relay_text(room_id, websocket, message["text"])
+                # y-websocket only speaks binary; text would be relayed unchecked.
+                raise WebSocketException(code=status.WS_1003_UNSUPPORTED_DATA, reason="Binary frames only")
     except WebSocketDisconnect:
         pass
     finally:

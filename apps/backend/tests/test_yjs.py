@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from starlette.websockets import WebSocketDisconnect
 
-from app.websocket.yjs import EMPTY_SYNC_STEP2
+from app.websocket.yjs import EMPTY_SYNC_STEP2, SYNC_REQUEST_BURST
 from tests.rig import auth, room_socket, roster, token
 
 # messageSync, SyncStep1, then a state vector for an empty document.
@@ -53,32 +53,81 @@ def test_leaving_closes_the_editor_socket(client, room):
 
 @pytest.mark.parametrize(
     "frame",
-    [bytes([0, 2, 5, 1, 2]), bytes([0, 2, 1, 1, 2]), bytes([0, 7, 1, 1]), bytes([0, 2])],
-    ids=["short-body", "trailing-bytes", "unknown-step", "no-length"],
+    [
+        bytes([0, 2, 5, 1, 2]),
+        bytes([0, 2, 1, 1, 2]),
+        bytes([0, 7, 1, 1]),
+        bytes([0, 2]),
+        bytes([0, 2, 0]),
+        bytes([0x80, 0x00, 0x02, 0x00]),
+        bytes([3]),
+    ],
+    ids=["short-body", "trailing-bytes", "unknown-step", "no-length", "empty-body", "padded-type", "query-awareness"],
 )
-def test_malformed_sync_frames_are_refused(client, room, frame):
+def test_malformed_frames_are_refused(client, room, frame):
     with room_socket(client, room["id"], "user_alice"), yjs_socket(client, room["id"], "user_alice") as alice:
         alice.send_bytes(frame)
         with pytest.raises(WebSocketDisconnect):
             alice.receive_bytes()
 
 
-def test_well_framed_sync_messages_are_recognised():
-    from app.websocket.yjs import EMPTY_SYNC_STEP2, is_well_framed_sync
+def test_editor_messages_are_classified_by_their_decoded_values():
+    from app.websocket.yjs import AWARENESS, EMPTY_SYNC_STEP2, SYNC_STEP1 as STEP1, SYNC_STEP2, SYNC_UPDATE, classify
 
-    assert all(is_well_framed_sync(frame) for frame in (SYNC_STEP1, UPDATE, EMPTY_SYNC_STEP2))
+    assert classify(SYNC_STEP1) == STEP1
+    assert classify(EMPTY_SYNC_STEP2) == SYNC_STEP2
+    assert classify(UPDATE) == SYNC_UPDATE
+    assert classify(bytes([1, 0])) == AWARENESS
     # A 200-byte body needs a two-byte length.
-    assert is_well_framed_sync(bytes([0, 2, 0xC8, 0x01]) + bytes(200))
+    assert classify(bytes([0, 2, 0xC8, 0x01]) + bytes(200)) == SYNC_UPDATE
+    # Padding a varuint does not change what lib0 reads, so it cannot change
+    # what the relay decides either.
+    assert classify(bytes([0x80, 0x00, 0x80, 0x00, 1, 0])) == STEP1
 
 
-def test_a_flood_of_sync_requests_closes_the_socket(client, room):
+def test_padded_sync_requests_count_against_the_limit(client, room):
+    padded = bytes([0x80, 0x00, 0x80, 0x00, 1, 0])
     with room_socket(client, room["id"], "user_alice"), yjs_socket(client, room["id"], "user_alice") as alice:
-        for _ in range(5):
-            alice.send_bytes(SYNC_STEP1)
+        for _ in range(SYNC_REQUEST_BURST):
+            alice.send_bytes(padded)
             assert alice.receive_bytes() == EMPTY_SYNC_STEP2
-        alice.send_bytes(SYNC_STEP1)
+        alice.send_bytes(padded)
         with pytest.raises(WebSocketDisconnect):
             alice.receive_bytes()
+
+
+def test_text_frames_are_refused(client, room):
+    with room_socket(client, room["id"], "user_alice"), yjs_socket(client, room["id"], "user_alice") as alice:
+        alice.send_text("hello")
+        with pytest.raises(WebSocketDisconnect):
+            alice.receive_bytes()
+
+
+def test_a_socket_past_its_byte_budget_is_closed(client, room):
+    # A well-framed update of 256 KB, the largest frame there is: four of them
+    # are the whole burst.
+    body = 256 * 1024 - 5
+    big = bytes([0, 2, 0x80 | body & 0x7F, 0x80 | body >> 7 & 0x7F, body >> 14]) + bytes(body)
+    with room_socket(client, room["id"], "user_alice"), yjs_socket(client, room["id"], "user_alice") as alice:
+        for _ in range(4):
+            alice.send_bytes(big)
+        alice.send_bytes(SYNC_STEP1)
+        assert alice.receive_bytes() == EMPTY_SYNC_STEP2
+        alice.send_bytes(big)
+        with pytest.raises(WebSocketDisconnect):
+            alice.receive_bytes()
+
+
+def test_a_flood_of_sync_requests_closes_the_socket_and_reconnecting_does_not_reset_it(client, room):
+    with room_socket(client, room["id"], "user_alice"):
+        with yjs_socket(client, room["id"], "user_alice") as alice:
+            for _ in range(SYNC_REQUEST_BURST):
+                alice.send_bytes(SYNC_STEP1)
+                assert alice.receive_bytes() == EMPTY_SYNC_STEP2
+        with yjs_socket(client, room["id"], "user_alice") as again:
+            again.send_bytes(SYNC_STEP1)
+            with pytest.raises(WebSocketDisconnect):
+                again.receive_bytes()
 
 
 def test_simultaneous_editor_handshakes_cannot_pass_the_cap_together():
