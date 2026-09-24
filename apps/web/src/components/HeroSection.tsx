@@ -1,5 +1,6 @@
 import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
 import { Link } from "react-router-dom";
+import { Github } from "lucide-react";
 import { PEOPLE, tokens, useDemo, type Demo, type Who } from "./heroDemo";
 import { Mascot, Sprite } from "./Pixel";
 import { button, eyebrow, heading, muted } from "../lib/ui";
@@ -110,6 +111,13 @@ const Workspace = () => {
 const HeroSection = () => (
   <>
     <section className="pt-12 pb-24 text-center sm:pt-20">
+      <a
+        href="https://github.com/naman0r/tandemcode"
+        className="px-box mb-8 inline-flex items-center gap-2 bg-zinc-900 px-3 py-1 font-pixel text-xl leading-none text-zinc-300 [--px:#3f3f46] hover:text-zinc-50 hover:[--px:#f97316]"
+      >
+        <Github className="h-4 w-4" />
+        Free and open source
+      </a>
       <p className={eyebrow}>2 PLAYERS. 1 EDITOR.</p>
       <h1 className="mt-5 font-pixel text-7xl leading-none sm:text-9xl">
         Code it <span className="text-orange-500">together.</span>
