@@ -23,8 +23,8 @@
   <a href="https://tandemcode.space"><img src="https://img.shields.io/website?url=https%3A%2F%2Ftandemcode.space&label=site&up_message=online&down_message=offline" alt="Site status"></a>
   <a href="https://api.tandemcode.space/health"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.tandemcode.space%2Fhealth&query=%24.status&label=api&color=brightgreen" alt="API status"></a>
   <a href="https://github.com/naman0r/tandemcode/deployments"><img src="https://img.shields.io/github/deployments/naman0r/tandemcode/Production?label=vercel&logo=vercel" alt="Vercel deployment"></a>
-  <a href="https://github.com/naman0r/tandemcode/actions/workflows/backend-tests.yml"><img src="https://github.com/naman0r/tandemcode/actions/workflows/backend-tests.yml/badge.svg" alt="Backend tests"></a>
-  <a href="https://github.com/naman0r/tandemcode/actions/workflows/web-checks.yml"><img src="https://github.com/naman0r/tandemcode/actions/workflows/web-checks.yml/badge.svg" alt="Web checks"></a>
+  <a href="https://github.com/naman0r/tandemcode/actions/workflows/backend-tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/naman0r/tandemcode/backend-tests.yml?branch=main&label=backend%20tests&logo=github" alt="Backend tests"></a>
+  <a href="https://github.com/naman0r/tandemcode/actions/workflows/web-checks.yml"><img src="https://img.shields.io/github/actions/workflow/status/naman0r/tandemcode/web-checks.yml?branch=main&label=web%20checks&logo=github" alt="Web checks"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/naman0r/tandemcode" alt="License"></a>
 </p>
 
