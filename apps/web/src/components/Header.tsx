@@ -1,67 +1,48 @@
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/clerk-react";
 import { Link, NavLink } from "react-router-dom";
-import { Moon, Sun } from "lucide-react";
-import { useTheme } from "../lib/theme";
-import { button } from "../lib/ui";
+import { Mascot } from "./Pixel";
 
 const navLink = ({ isActive }: { isActive: boolean }) =>
-  `rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-    isActive
-      ? "bg-zinc-100 text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100"
-      : "text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-  }`;
+  `font-pixel text-xl transition-colors ${isActive ? "text-orange-400" : "text-zinc-400 hover:text-zinc-100"}`;
 
-const Header = () => {
-  const { theme, toggle } = useTheme();
-
-  return (
-    <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/80 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/80">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6">
-        <div className="flex items-center gap-6">
-          <Link to="/" className="flex items-center gap-2 font-semibold">
-            <img src="/icon.png" alt="" className="h-7 w-7" />
-            <span>TandemCode</span>
-          </Link>
-          <nav className="flex items-center gap-1">
-            <NavLink to="/rooms" className={navLink}>
-              Rooms
-            </NavLink>
-            <NavLink to="/problems" className={navLink}>
-              Problems
-            </NavLink>
-            <NavLink to="/about" className={navLink}>
-              About
-            </NavLink>
-          </nav>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-            title={theme === "dark" ? "Light mode" : "Dark mode"}
-            className={`${button.ghost} px-2`}
-          >
-            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-          <SignedOut>
-            <SignInButton mode="modal">
-              <button type="button" className={button.primary}>
-                Sign in
-              </button>
-            </SignInButton>
-          </SignedOut>
-          <SignedIn>
-            <NavLink to="/dashboard" className={navLink}>
-              Dashboard
-            </NavLink>
-            <UserButton appearance={{ elements: { avatarBox: "h-8 w-8" } }} />
-          </SignedIn>
-        </div>
+const Header = () => (
+  <header className="sticky top-0 z-40 border-b-4 border-zinc-900 bg-[#0c0c0e]/90 backdrop-blur">
+    <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
+      <div className="flex items-center gap-4 sm:gap-8">
+        <Link to="/" className="flex items-center gap-2.5" aria-label="TandemCode home">
+          <Mascot className="h-9 w-9" />
+          <span className="hidden font-pixel text-3xl leading-none sm:inline">TandemCode</span>
+        </Link>
+        <nav className="flex items-center gap-4 sm:gap-6">
+          <NavLink to="/rooms" className={navLink}>
+            Rooms
+          </NavLink>
+          <NavLink to="/problems" className={navLink}>
+            Problems
+          </NavLink>
+          <NavLink to="/about" className={navLink}>
+            About
+          </NavLink>
+        </nav>
       </div>
-    </header>
-  );
-};
+
+      <div className="flex items-center gap-4">
+        <SignedOut>
+          <SignInButton mode="modal">
+            <button type="button" className="px-box bg-zinc-100 px-3 py-1 font-pixel text-xl leading-none text-zinc-950 [--px:#0a0a0b] hover:bg-white">
+              Sign in
+            </button>
+          </SignInButton>
+        </SignedOut>
+        <SignedIn>
+          <NavLink to="/dashboard" className={navLink}>
+            Dashboard
+          </NavLink>
+          <UserButton appearance={{ elements: { avatarBox: "h-8 w-8 rounded-none" } }} />
+        </SignedIn>
+      </div>
+    </div>
+  </header>
+);
 
 export default Header;

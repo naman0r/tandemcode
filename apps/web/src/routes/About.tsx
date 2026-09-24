@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { SignedIn, SignedOut, SignInButton } from "@clerk/clerk-react";
 import { ArrowRight, FileText, Plus, Terminal, Video } from "lucide-react";
 import Layout from "../components/Layout";
-import { muted } from "../lib/ui";
+import { Mascot, Sprite } from "../components/Pixel";
+import { button, eyebrow, heading, muted, title } from "../lib/ui";
 
 const PHASES = [
   {
@@ -79,7 +80,7 @@ const FAQ: [string, ReactNode][] = [
       right.{" "}
       <a
         href={CONTRIBUTING_URL}
-        className="font-medium text-zinc-900 underline decoration-orange-500 decoration-2 underline-offset-4 hover:text-orange-600 dark:text-zinc-100 dark:hover:text-orange-400"
+        className="font-medium text-zinc-100 underline decoration-orange-500 decoration-2 underline-offset-4 hover:text-orange-400"
       >
         The guide
       </a>{" "}
@@ -96,94 +97,89 @@ const Rise = ({ delay, className = "", children }: { delay: number; className?: 
   </div>
 );
 
-const eyebrow = "font-mono text-xs uppercase tracking-[0.2em] text-orange-600 dark:text-orange-400";
-
 // Three things that do not know about each other, pinned at odd angles.
 const Scattered = () => (
   <div className="relative h-64">
-    <div className="absolute top-2 left-2 w-56 -rotate-6 rounded-lg border border-dashed border-zinc-300 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+    <div className="absolute top-2 left-2 w-56 -rotate-6 border-2 border-dashed border-zinc-700 bg-zinc-900 p-4">
       <div className={`${muted} flex items-center gap-2 text-xs`}>
         <Video className="h-4 w-4" /> Video call · 00:42:13
       </div>
-      <div className="mt-3 h-16 rounded bg-zinc-100 dark:bg-zinc-800" />
+      <div className="mt-3 h-16 bg-zinc-800" />
     </div>
-    <div className="absolute top-16 right-4 w-52 rotate-3 rounded-lg border border-dashed border-zinc-300 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+    <div className="absolute top-16 right-4 w-52 rotate-3 border-2 border-dashed border-zinc-700 bg-zinc-900 p-4">
       <div className={`${muted} flex items-center gap-2 text-xs`}>
         <FileText className="h-4 w-4" /> Untitled document
       </div>
       <div className="mt-3 space-y-1.5">
-        <div className="h-2 w-5/6 rounded bg-zinc-200 dark:bg-zinc-700" />
-        <div className="h-2 w-2/3 rounded bg-zinc-200 dark:bg-zinc-700" />
-        <div className="h-2 w-3/4 rounded bg-zinc-200 dark:bg-zinc-700" />
+        <div className="h-2 w-5/6 bg-zinc-700" />
+        <div className="h-2 w-2/3 bg-zinc-700" />
+        <div className="h-2 w-3/4 bg-zinc-700" />
       </div>
     </div>
-    <div className="absolute bottom-2 left-12 w-60 -rotate-2 rounded-lg border border-dashed border-zinc-300 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+    <div className="absolute bottom-2 left-12 w-60 -rotate-2 border-2 border-dashed border-zinc-700 bg-zinc-900 p-4">
       <div className={`${muted} flex items-center gap-2 text-xs`}>
         <Terminal className="h-4 w-4" /> judge · tab 3 of 11
       </div>
-      <div className="mt-3 font-mono text-xs text-zinc-400">paste code here, run, switch back...</div>
+      <div className="mt-3 font-mono text-xs text-zinc-500">paste code here, run, switch back...</div>
     </div>
   </div>
 );
 
 // The same three jobs in one window, like the one on the landing page.
 const OneRoom = () => (
-  <div className="overflow-hidden rounded-2xl bg-zinc-900 shadow-2xl shadow-black/20 ring-1 ring-zinc-800">
-    <div className="flex items-center justify-between bg-zinc-800 px-4 py-2.5 text-xs">
-      <span className="font-mono text-zinc-400">valid_parentheses.py</span>
-      <span className="flex items-center gap-3">
+  <div className="px-box overflow-hidden bg-zinc-900 [--px:#3f3f46]">
+    <div className="flex items-center justify-between border-b-4 border-zinc-800 px-4 py-2.5">
+      <span className="font-pixel text-lg text-zinc-300">valid_parentheses.py</span>
+      <span className="flex items-center gap-3 font-pixel text-lg">
         <span className="flex items-center gap-1.5 text-orange-300">
-          <span className="h-2 w-2 rounded-full bg-orange-400" /> Alice
+          <Sprite name="maya" size={16} /> maya
         </span>
         <span className="flex items-center gap-1.5 text-sky-300">
-          <span className="h-2 w-2 rounded-full bg-sky-400" /> Bob
+          <Sprite name="theo" size={16} /> theo
         </span>
       </span>
     </div>
     <div className="grid grid-cols-[1fr_9rem]">
-      <pre className="p-4 font-mono text-xs leading-6 text-zinc-300">
-        <span className="text-purple-400">for</span> ch <span className="text-purple-400">in</span> s:{"\n"}
+      <pre className="bg-zinc-950/60 p-4 font-mono text-xs leading-6 text-zinc-300">
+        <span className="text-violet-300">for</span> ch <span className="text-violet-300">in</span> s:{"\n"}
         {"  "}
-        <span className="text-purple-400">if</span> ch <span className="text-purple-400">in</span> pairs:{"\n"}
+        <span className="text-violet-300">if</span> ch <span className="text-violet-300">in</span> pairs:{"\n"}
         {"    "}stack.append(ch)
         <span className="ml-0.5 inline-block h-3.5 w-0.5 bg-sky-400 align-middle" />
         {"\n"}
         {"  "}
-        <span className="text-purple-400">elif</span> <span className="text-purple-400">not</span> stack
+        <span className="text-violet-300">elif</span> <span className="text-violet-300">not</span> stack
         <span className="ml-0.5 inline-block h-3.5 w-0.5 bg-orange-400 align-middle" />
       </pre>
-      <div className="space-y-2 border-l border-zinc-800 p-3 text-[11px] leading-4">
-        <p className="rounded-md bg-zinc-800 px-2 py-1.5 text-zinc-300">
-          <span className="text-orange-300">Alice</span> empty string?
+      <div className="space-y-2 border-l-4 border-zinc-800 p-3 text-[11px] leading-4">
+        <p className="border-l-4 border-orange-500 bg-zinc-800 px-2 py-1.5 text-zinc-300">
+          <span className="text-orange-300">maya</span> empty string?
         </p>
-        <p className="rounded-md bg-zinc-800 px-2 py-1.5 text-zinc-300">
-          <span className="text-sky-300">Bob</span> returns True
+        <p className="border-l-4 border-sky-500 bg-zinc-800 px-2 py-1.5 text-zinc-300">
+          <span className="text-sky-300">theo</span> returns True
         </p>
       </div>
     </div>
-    <div className="flex items-center gap-2 border-t border-zinc-800 bg-zinc-800/60 px-4 py-2.5 text-xs text-green-400">
-      <span className="h-2 w-2 rounded-full bg-green-500" /> 6/6 tests passed, seen by both
+    <div className="flex items-center gap-3 border-t-4 border-zinc-800 px-4 py-2.5 font-pixel text-xl">
+      <span className="text-2xl text-emerald-400">ACCEPTED</span>
+      <span className="text-zinc-400">6/6 tests, seen by both</span>
     </div>
   </div>
 );
 
 const About = () => (
   <Layout wide>
-    <div className="relative">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[40rem]" aria-hidden>
-        <div className="absolute -top-24 left-1/4 h-[32rem] w-[32rem] rounded-full bg-[radial-gradient(closest-side,rgba(249,115,22,0.14),transparent)] dark:bg-[radial-gradient(closest-side,rgba(249,115,22,0.24),transparent)]" />
-        <div className="absolute top-20 right-0 h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(closest-side,rgba(30,58,138,0.18),transparent)] dark:bg-[radial-gradient(closest-side,rgba(37,99,235,0.24),transparent)]" />
-      </div>
+    <div>
 
       <section className="max-w-4xl pt-10 pb-20 lg:pt-20 lg:pb-28">
         <Rise delay={0}>
-          <p className={eyebrow}>About</p>
+          <p className={eyebrow}>ABOUT</p>
         </Rise>
         <Rise delay={80}>
-          <h1 className="mt-5 text-5xl leading-[1.05] font-bold tracking-tight sm:text-6xl lg:text-7xl">
+          <h1 className="mt-5 font-pixel text-6xl leading-[0.9] sm:text-7xl lg:text-8xl">
             Interviews happen out loud.
             <br />
-            <span className="text-orange-500 dark:text-orange-400">Practice should too.</span>
+            <span className="text-orange-500">Practice should too.</span>
           </h1>
         </Rise>
         <Rise delay={160}>
@@ -196,10 +192,10 @@ const About = () => (
       </section>
 
       <Rise delay={240}>
-        <section className="grid items-start gap-12 border-y border-zinc-200 py-16 lg:grid-cols-2 lg:gap-20 dark:border-zinc-800">
+        <section className="grid items-start gap-12 border-y-4 border-zinc-900 py-16 lg:grid-cols-2 lg:gap-20">
           <div>
-            <p className={eyebrow}>Without it</p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight">Three tabs that don't talk to each other</h2>
+            <p className={eyebrow}>WITHOUT IT</p>
+            <h2 className={`${heading} mt-3 text-4xl!`}>Three tabs that don't talk to each other</h2>
             <p className={`${muted} mt-3 max-w-md leading-relaxed`}>
               A call to talk, a document to type in that cannot run anything, and a judge in another
               tab that only one of you can see.
@@ -209,8 +205,8 @@ const About = () => (
             </div>
           </div>
           <div>
-            <p className={eyebrow}>With TandemCode</p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight">One room</h2>
+            <p className={eyebrow}>WITH TANDEMCODE</p>
+            <h2 className={`${heading} mt-3 text-4xl!`}>One room</h2>
             <p className={`${muted} mt-3 max-w-md leading-relaxed`}>
               A shared editor with both cursors, chat beside it, and tests that pass or fail in front
               of both of you. When you are done, replay the session to see how you got there.
@@ -223,21 +219,21 @@ const About = () => (
       </Rise>
 
       <section className="py-20 lg:py-28">
-        <p className={eyebrow}>How to use it</p>
-        <h2 className="mt-3 max-w-xl text-3xl font-bold tracking-tight sm:text-4xl">
+        <p className={eyebrow}>HOW TO USE IT</p>
+        <h2 className={`${title} mt-3 max-w-2xl`}>
           From an empty room to a replay in seven steps
         </h2>
         <div className="mt-14 grid gap-12 md:grid-cols-3 md:gap-8">
           {PHASES.map((phase, phaseIndex) => (
             <div key={phase.label}>
-              <div className="flex items-baseline gap-3 border-t-2 border-orange-500 pt-4">
-                <span className="font-mono text-sm text-orange-600 dark:text-orange-400">0{phaseIndex + 1}</span>
-                <h3 className="text-lg font-semibold">{phase.label}</h3>
+              <div className="flex items-baseline gap-3 border-t-4 border-orange-500 pt-4">
+                <span className="font-silk text-xs text-orange-400">0{phaseIndex + 1}</span>
+                <h3 className={heading}>{phase.label}</h3>
               </div>
-              <ol className="mt-6 space-y-7 border-l border-zinc-200 pl-6 dark:border-zinc-800">
+              <ol className="mt-6 space-y-7 border-l-4 border-zinc-900 pl-6">
                 {phase.steps.map(([title, text], stepIndex) => (
                   <li key={title} className="relative">
-                    <span className="absolute top-0.5 -left-[2.1rem] flex h-5 w-5 items-center justify-center rounded-full bg-zinc-50 font-mono text-[10px] font-semibold text-zinc-500 ring-1 ring-zinc-300 dark:bg-zinc-950 dark:text-zinc-400 dark:ring-zinc-700">
+                    <span className="absolute top-0 -left-[2.4rem] flex h-6 w-6 items-center justify-center border-2 border-zinc-700 bg-[#0c0c0e] font-pixel text-base text-zinc-400">
                       {firstStep(phaseIndex) + stepIndex}
                     </span>
                     <h4 className="font-medium">{title}</h4>
@@ -250,15 +246,15 @@ const About = () => (
         </div>
       </section>
 
-      <section className="grid gap-10 border-t border-zinc-200 py-20 lg:grid-cols-[1fr_2fr] lg:gap-16 lg:py-28 dark:border-zinc-800">
+      <section className="grid gap-10 border-t-4 border-zinc-900 py-20 lg:grid-cols-[1fr_2fr] lg:gap-16 lg:py-28">
         <div className="lg:sticky lg:top-24 lg:self-start">
           <p className={eyebrow}>FAQ</p>
-          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Questions, answered</h2>
+          <h2 className={`${title} mt-3`}>Questions, answered</h2>
           <p className={`${muted} mt-4 leading-relaxed`}>
             Something missing?{" "}
             <a
               href="https://github.com/naman0r/tandemcode/issues"
-              className="font-medium text-zinc-900 underline decoration-orange-500 decoration-2 underline-offset-4 hover:text-orange-600 dark:text-zinc-100 dark:hover:text-orange-400"
+              className="font-medium text-zinc-100 underline decoration-orange-500 decoration-2 underline-offset-4 hover:text-orange-400"
             >
               Open an issue
             </a>
@@ -266,30 +262,28 @@ const About = () => (
           </p>
           <a
             href={CONTRIBUTING_URL}
-            className="group mt-8 block rounded-xl border border-orange-200 bg-orange-50 p-5 transition-colors hover:border-orange-400 dark:border-orange-900 dark:bg-orange-950/40 dark:hover:border-orange-600"
+            className="px-box group mt-10 block bg-orange-950/50 p-5 [--px:#9a3412] hover:[--px:#f97316]"
           >
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-orange-600 dark:text-orange-400">
-              Contribute
-            </p>
-            <p className="mt-2 font-semibold">Add a problem to TandemCode</p>
+            <p className="font-silk text-xs tracking-[0.2em] text-orange-400">CONTRIBUTE</p>
+            <p className={`${heading} mt-2`}>Add a problem to TandemCode</p>
             <p className={`${muted} mt-1 text-sm leading-relaxed`}>
               Write the statement, tests and a solution, and open a pull request. CI checks that your
               solution passes every test.
             </p>
-            <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-orange-600 dark:text-orange-400">
+            <span className="mt-3 inline-flex items-center gap-1.5 font-pixel text-xl text-orange-400">
               Read the guide
               <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
             </span>
           </a>
         </div>
-        <div className="border-t border-zinc-200 dark:border-zinc-800">
+        <div className="border-t-2 border-zinc-800">
           {FAQ.map(([question, answer], index) => (
-            <details key={question} className="group border-b border-zinc-200 dark:border-zinc-800">
+            <details key={question} className="group border-b-2 border-zinc-800">
               <summary className="flex cursor-pointer list-none items-center gap-5 py-5 [&::-webkit-details-marker]:hidden">
-                <span className="font-mono text-xs text-zinc-400 group-open:text-orange-500">
+                <span className="font-silk text-xs text-zinc-500 group-open:text-orange-400">
                   {String(index + 1).padStart(2, "0")}
                 </span>
-                <span className="flex-1 font-medium group-hover:text-orange-600 dark:group-hover:text-orange-400">
+                <span className="flex-1 font-medium group-hover:text-orange-400">
                   {question}
                 </span>
                 <Plus className="h-4 w-4 shrink-0 text-zinc-400 transition-transform duration-200 group-open:rotate-45 group-open:text-orange-500" />
@@ -300,40 +294,30 @@ const About = () => (
         </div>
       </section>
 
-      <section className="relative mb-8 overflow-hidden rounded-3xl bg-zinc-900 px-8 py-14 text-white sm:px-14">
-        <div
-          className="pointer-events-none absolute -top-32 -right-24 h-96 w-96 rounded-full bg-[radial-gradient(closest-side,rgba(249,115,22,0.35),transparent)]"
-          aria-hidden
-        />
-        <div className="relative flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
-          <h2 className="max-w-lg text-3xl font-bold tracking-tight">
-            Find a partner. <span className="text-orange-400">Open a room.</span>
-          </h2>
-          <div className="flex flex-wrap gap-3">
+      <section className="px-box mb-8 bg-zinc-900 px-8 py-12 [--px:#3f3f46] sm:px-14">
+        <div className="flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-6">
+            <Mascot className="hidden h-24 w-24 sm:block" />
+            <h2 className={`${title} max-w-lg`}>
+              Find a partner. <span className="text-orange-500">Open a room.</span>
+            </h2>
+          </div>
+          <div className="flex flex-wrap gap-5">
             <SignedOut>
               <SignInButton mode="modal">
-                <button
-                  type="button"
-                  className="group inline-flex items-center gap-2 rounded-xl bg-orange-500 px-6 py-3 font-semibold text-zinc-950 transition-colors hover:bg-orange-400"
-                >
+                <button type="button" className={`${button.primary} group px-5! py-2.5! text-2xl!`}>
                   Sign in to start
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </button>
               </SignInButton>
             </SignedOut>
             <SignedIn>
-              <Link
-                to="/rooms/create"
-                className="group inline-flex items-center gap-2 rounded-xl bg-orange-500 px-6 py-3 font-semibold text-zinc-950 transition-colors hover:bg-orange-400"
-              >
+              <Link to="/rooms/create" className={`${button.primary} group px-5! py-2.5! text-2xl!`}>
                 Create a room
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
               </Link>
             </SignedIn>
-            <Link
-              to="/rooms"
-              className="inline-flex items-center rounded-xl px-6 py-3 font-semibold text-zinc-200 ring-1 ring-zinc-700 transition-colors hover:bg-zinc-800"
-            >
+            <Link to="/rooms" className={`${button.secondary} px-5! py-2.5! text-2xl!`}>
               Browse rooms
             </Link>
           </div>

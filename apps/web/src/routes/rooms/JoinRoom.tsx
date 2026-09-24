@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Layout from "../../components/Layout";
 import RequireSignIn from "../../components/RequireSignIn";
-import { button, card, input, muted } from "../../lib/ui";
+import { button, card, input, muted, title } from "../../lib/ui";
 
 // Accepts the invite link as copied from a room, or a bare id.
 const roomIdFrom = (value: string): string => {
@@ -27,8 +27,8 @@ const JoinRoom = () => {
       <RequireSignIn>
         <form onSubmit={submit} className={`${card} mx-auto max-w-md space-y-5 p-6`}>
           <div>
-            <h1 className="text-xl font-semibold">Join a room</h1>
-            <p className={`${muted} mt-1 text-sm`}>Paste the invite link your partner sent you.</p>
+            <h1 className={`${title} text-4xl!`}>Join a room</h1>
+            <p className={`${muted} mt-2 text-sm`}>Paste the invite link your partner sent you.</p>
           </div>
           <label className="block text-sm">
             <span className="mb-1 block font-medium">Invite link</span>
@@ -42,7 +42,7 @@ const JoinRoom = () => {
             />
           </label>
           <div className="flex items-center justify-between">
-            <Link to="/rooms" className={`${muted} text-sm hover:underline`}>
+            <Link to="/rooms" className={`${muted} text-sm hover:text-zinc-100`}>
               Browse open rooms
             </Link>
             <button type="submit" disabled={!value.trim()} className={button.primary}>
