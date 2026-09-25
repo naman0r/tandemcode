@@ -131,13 +131,11 @@ class SubmissionDAO:
             return await conn.fetchval(query, user_id, seconds)
 
     async def request_analysis(self, submission_id: UUID, user_id: str) -> dict | None:
-        """Queue an analysis of an accepted run, unless one is queued or done already."""
+        """Queue an analysis of an accepted run that has never had one."""
         query = """
             UPDATE submissions
-            SET analysis_status = 'pending', analysis = NULL,
-                analysis_requested_by = $2, analysis_requested_at = NOW()
-            WHERE id = $1 AND status = 'accepted'
-              AND (analysis_status IS NULL OR analysis_status = 'failed')
+            SET analysis_status = 'pending', analysis_requested_by = $2, analysis_requested_at = NOW()
+            WHERE id = $1 AND status = 'accepted' AND analysis_status IS NULL
             RETURNING id
         """
         async with self.pool.acquire() as conn:

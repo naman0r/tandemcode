@@ -60,7 +60,7 @@ async def analyze_next(submissions: SubmissionDAO, problems: ProblemDAO) -> bool
         analysis = await asyncio.to_thread(run_analysis, submission["code"] or "", spec["generator"], spec["memLimitMb"])
     except Exception:
         logger.exception("Analysis failed for submission %s", submission["id"])
-        analysis = {"points": [], "complexity": None, "slope": None, "note": "The analysis could not run. Try again later."}
+        analysis = {"points": [], "complexity": None, "slope": None, "note": "The analysis could not run."}
 
     status = "done" if analysis["complexity"] else "failed"
     try:

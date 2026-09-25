@@ -59,6 +59,21 @@ def test_asking_twice_does_not_queue_a_second_analysis(client, room):
     assert analyze_queue(client) == 1
 
 
+def test_a_failed_analysis_is_final(client, room):
+    """Retries would reuse the run's row, which the hourly limit counts once."""
+    submission = accepted_run(client, room)
+    ask(client, room, submission["id"])
+    dao = SubmissionDAO(client.app.state.db_pool)
+    claimed = client.portal.call(dao.claim_pending_analysis)
+    failed = {"points": [], "complexity": None, "slope": None, "note": "Stopped at n = 1000."}
+    client.portal.call(dao.complete_analysis, claimed["id"], "failed", failed)
+
+    again = ask(client, room, submission["id"])
+    assert again.status_code == 200, again.text
+    assert again.json()["analysisStatus"] == "failed"
+    assert analyze_queue(client) == 0
+
+
 def test_only_accepted_runs_can_be_analyzed(client, room):
     submission = submit(client, room, "print('0 0')\n").json()
     drain_queue(client)

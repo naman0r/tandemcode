@@ -96,14 +96,20 @@ const ComplexityPanel = ({ submission, expected }: { submission: Submission; exp
     );
   }
 
+  if (state === "failed") {
+    return (
+      <p className={`${muted} border-t-2 border-zinc-800 px-4 py-3 text-sm`}>
+        No estimate for this run. {analysis?.note ?? ""}
+      </p>
+    );
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-3 border-t-2 border-zinc-800 px-4 py-3 text-sm">
       <button type="button" onClick={ask} disabled={asking} className={button.secondary}>
-        {state === "failed" ? "Try the analysis again" : "Analyze complexity"}
+        Analyze complexity
       </button>
-      <span className={muted}>
-        {state === "failed" && analysis?.note ? analysis.note : "Reruns this solution on bigger inputs to see how its time grows."}
-      </span>
+      <span className={muted}>Reruns this solution on bigger inputs to see how its time grows.</span>
       {error && <span className="text-red-300">{error}</span>}
     </div>
   );

@@ -126,9 +126,12 @@ class SubmissionService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="This problem does not support complexity analysis yet",
             )
-        # Both people in a room can press the button; the second press sees
-        # the first one's analysis instead of queueing another.
-        if submission["analysisStatus"] in ("pending", "running", "done"):
+        # One analysis per run, whatever it found. Both people in a room can
+        # press the button, and the second press sees the first one's. A
+        # failed one is final too: the hourly limit counts runs, so retries of
+        # one run would never reach it, and the same program on the same
+        # inputs would fail the same way.
+        if submission["analysisStatus"] is not None:
             return submission
         if await self.submission_dao.count_analyses_since(caller_id, 3600) >= ANALYSES_PER_HOUR:
             raise HTTPException(
