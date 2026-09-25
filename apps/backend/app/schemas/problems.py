@@ -20,3 +20,5 @@ class ProblemResponse(BaseModel):
     statement: str | None
     starterCode: str | None
     samples: list[SampleTest]
+    analyzable: bool = False
+    expectedComplexity: str | None = None

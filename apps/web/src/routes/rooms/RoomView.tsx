@@ -6,6 +6,7 @@ import RequireSignIn from "../../components/RequireSignIn";
 import RoomChatComponent from "../../components/RoomChatComponent";
 import RoomMembersPanel from "../../components/RoomMembersPanel";
 import CollaborativeEditor from "../../components/CollaborativeEditor";
+import ComplexityPanel from "../../components/ComplexityPanel";
 import InviteButton from "../../components/InviteButton";
 import { useUser } from "../../hooks/useUser";
 import useWebSocket from "../../hooks/UseWebSocket";
@@ -25,6 +26,8 @@ type Problem = {
   statement: string | null;
   starterCode: string | null;
   samples: { input: string; expected: string }[];
+  analyzable: boolean;
+  expectedComplexity: string | null;
 };
 
 type Room = {
@@ -455,6 +458,9 @@ const Room = ({ roomId }: { roomId: string }) => {
               </p>
             )}
             {shown && <VerdictPanel submission={shown} color={colorOf(shown.userId)} />}
+            {shown?.status === "accepted" && problem?.analyzable && shown.problemId === problem.id && (
+              <ComplexityPanel submission={shown} expected={problem.expectedComplexity} />
+            )}
           </section>
 
           <section className={`${card} p-5`}>

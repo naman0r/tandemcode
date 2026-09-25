@@ -1,5 +1,9 @@
 """Claim pending submissions and judge them, one at a time.
 
+Complexity analyses share the runner but only run when no submission is
+waiting, so asking for one never delays anyone's verdict by more than the
+analysis already in progress.
+
 The submissions table is the queue: a row is claimed by moving it to
 ``running`` under ``FOR UPDATE SKIP LOCKED``, so several runners can share a
 database without judging the same submission twice.
@@ -16,6 +20,7 @@ from app.dao.problems import ProblemDAO
 from app.dao.submissions import SubmissionDAO
 from app.database import create_pool
 from app.runner import sandbox
+from app.runner.complexity import analyze
 from app.runner.judge import RUNTIME_ERROR, Verdict, judge
 
 logger = logging.getLogger(__name__)
@@ -34,6 +39,40 @@ def run_judge(code: str, tests: list[dict], time_limit_ms: int, mem_limit_mb: in
     if SANDBOX_IMAGE:
         return sandbox.judge_in_container(SANDBOX_IMAGE, code, tests, time_limit_ms, mem_limit_mb)
     return judge(code, tests, time_limit_ms, mem_limit_mb)
+
+
+def run_analysis(code: str, generator: str, mem_limit_mb: int) -> dict:
+    if SANDBOX_IMAGE:
+        return sandbox.analyze_in_container(SANDBOX_IMAGE, code, generator, mem_limit_mb)
+    return analyze(code, generator, mem_limit_mb)
+
+
+async def analyze_next(submissions: SubmissionDAO, problems: ProblemDAO) -> bool:
+    """Analyze one accepted run if one is waiting. Returns whether it did."""
+    submission = await submissions.claim_pending_analysis()
+    if submission is None:
+        return False
+
+    try:
+        spec = await problems.get_analysis_spec(submission["problemId"])
+        if spec is None:
+            raise RuntimeError("the problem has no generator")
+        analysis = await asyncio.to_thread(run_analysis, submission["code"] or "", spec["generator"], spec["memLimitMb"])
+    except Exception:
+        logger.exception("Analysis failed for submission %s", submission["id"])
+        analysis = {"points": [], "complexity": None, "slope": None, "note": "The analysis could not run."}
+
+    status = "done" if analysis["complexity"] else "failed"
+    try:
+        await submissions.complete_analysis(submission["id"], status, analysis)
+    except Exception:
+        logger.exception("Could not store the analysis for submission %s", submission["id"])
+        status = "failed"
+        await submissions.complete_analysis(
+            submission["id"], status, {"points": [], "complexity": None, "slope": None, "note": "The analysis could not be saved."}
+        )
+    logger.info("Submission %s analysis: %s", submission["id"], analysis["complexity"] or status)
+    return True
 
 
 async def judge_next(submissions: SubmissionDAO, problems: ProblemDAO) -> bool:
@@ -80,9 +119,10 @@ async def main() -> None:
     # claimed again. One runner at a time is the local setup, so on boot
     # anything still running is ours from before and goes back in the queue.
     await submissions.requeue_running()
+    await submissions.requeue_running_analyses()
     try:
         while True:
-            if not await judge_next(submissions, problems):
+            if not await judge_next(submissions, problems) and not await analyze_next(submissions, problems):
                 await asyncio.sleep(POLL_SECONDS)
     finally:
         await pool.close()

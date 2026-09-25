@@ -17,15 +17,17 @@ import subprocess
 import uuid
 from pathlib import Path
 
+from app.runner import complexity
 from app.runner.judge import RUNTIME_ERROR, TestOutcome, Verdict
 
 logger = logging.getLogger(__name__)
 
 JUDGE_SOURCE = (Path(__file__).parent / "judge.py").read_text()
+COMPLEXITY_SOURCE = (Path(__file__).parent / "complexity.py").read_text()
 
 # Room for the interpreter and the judge on top of the program's own limit.
 CONTAINER_MEMORY_OVERHEAD_MB = 64
-# Container start and interpreter start, on top of the tests' own limits.
+# Container start and interpreter start, on top of the program's own limits.
 STARTUP_ALLOWANCE_SECONDS = 20
 
 # `runsc` in production: gVisor answers the program's system calls itself, so
@@ -40,9 +42,8 @@ def pull(image: str) -> None:
     subprocess.run(["docker", "pull", "--quiet", image], check=True, capture_output=True, timeout=600)
 
 
-def judge_in_container(
-    image: str, code: str, tests: list[dict], time_limit_ms: int, mem_limit_mb: int
-) -> Verdict:
+def _run_in_container(image: str, source: str, spec: dict, mem_limit_mb: int, timeout: float) -> dict | None:
+    """Run a program file from this package in a fresh container; its JSON result, or None if it hung."""
     name = f"judge-{uuid.uuid4().hex[:12]}"
     command = [
         "docker", "run", "--rm", "--interactive", "--name", name,
@@ -61,27 +62,32 @@ def judge_in_container(
         "--env", "PYTHONDONTWRITEBYTECODE=1",
         *(["--runtime", SANDBOX_RUNTIME] if SANDBOX_RUNTIME else []),
         image,
-        "python", "-I", "-c", JUDGE_SOURCE,
+        "python", "-I", "-c", source,
     ]
-    spec = json.dumps(
-        {"code": code, "tests": tests, "timeLimitMs": time_limit_ms, "memLimitMb": mem_limit_mb}
-    )
-    timeout = len(tests) * time_limit_ms / 1000 + STARTUP_ALLOWANCE_SECONDS
     try:
         completed = subprocess.run(
-            command, input=spec.encode(), capture_output=True, timeout=timeout
+            command, input=json.dumps(spec).encode(), capture_output=True, timeout=timeout
         )
     except subprocess.TimeoutExpired:
-        # The judge inside enforces per-test limits; reaching this means the
+        # The program inside enforces its own limits; reaching this means the
         # container itself hung. Make sure it is gone.
         subprocess.run(["docker", "rm", "--force", name], capture_output=True, timeout=60)
         logger.error("Sandbox %s exceeded %.0fs and was removed", name, timeout)
-        return Verdict(status=RUNTIME_ERROR, timeMs=0, passed=0, total=len(tests))
+        return None
 
     if completed.returncode != 0:
         raise RuntimeError(f"Sandbox exited {completed.returncode}: {completed.stderr.decode(errors='replace')[:500]}")
+    return json.loads(completed.stdout)
 
-    data = json.loads(completed.stdout)
+
+def judge_in_container(
+    image: str, code: str, tests: list[dict], time_limit_ms: int, mem_limit_mb: int
+) -> Verdict:
+    spec = {"code": code, "tests": tests, "timeLimitMs": time_limit_ms, "memLimitMb": mem_limit_mb}
+    timeout = len(tests) * time_limit_ms / 1000 + STARTUP_ALLOWANCE_SECONDS
+    data = _run_in_container(image, JUDGE_SOURCE, spec, mem_limit_mb, timeout)
+    if data is None:
+        return Verdict(status=RUNTIME_ERROR, timeMs=0, passed=0, total=len(tests))
     return Verdict(
         status=data["status"],
         timeMs=data["timeMs"],
@@ -89,3 +95,13 @@ def judge_in_container(
         total=data["total"],
         tests=[TestOutcome(**outcome) for outcome in data["tests"]],
     )
+
+
+def analyze_in_container(image: str, code: str, generator: str, mem_limit_mb: int) -> dict:
+    spec = {"code": code, "generator": generator, "memLimitMb": mem_limit_mb}
+    # Generating the inputs takes a moment on top of the measured runs.
+    timeout = complexity.BUDGET_SECONDS + complexity.PER_RUN_SECONDS + STARTUP_ALLOWANCE_SECONDS
+    data = _run_in_container(image, COMPLEXITY_SOURCE, spec, mem_limit_mb, timeout)
+    if data is None:
+        return {"points": [], "complexity": None, "slope": None, "note": "The analysis did not finish in time."}
+    return data

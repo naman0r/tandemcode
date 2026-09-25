@@ -56,6 +56,9 @@ async def _settle_runs(pool) -> None:
         await conn.execute(
             "UPDATE submissions SET status = 'runtime_error' WHERE status IN ('pending', 'running')"
         )
+        await conn.execute(
+            "UPDATE submissions SET analysis_status = 'failed' WHERE analysis_status IN ('pending', 'running')"
+        )
 
 
 @pytest.fixture(autouse=True)

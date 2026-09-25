@@ -9,7 +9,7 @@ import asyncpg
 SELECT_SUBMISSION = """
     SELECT s.id, s.room_id, s.user_id, s.problem_id, s.language, s.code, s.status,
            s.time_ms, s.created_at, s.s3_key_stdout, s.s3_key_stderr,
-           s.s3_key_result_json, s.result, u.name AS user_name
+           s.s3_key_result_json, s.result, s.analysis_status, s.analysis, u.name AS user_name
     FROM submissions s
     JOIN users u ON u.id = s.user_id
 """
@@ -40,6 +40,8 @@ def _map_submission(row: asyncpg.Record) -> dict:
         "s3KeyStderr": row["s3_key_stderr"],
         "s3KeyResultJson": row["s3_key_result_json"],
         "result": json.loads(row["result"]) if row["result"] else None,
+        "analysisStatus": row["analysis_status"],
+        "analysis": json.loads(row["analysis"]) if row["analysis"] else None,
     }
 
 
@@ -118,4 +120,55 @@ class SubmissionDAO:
     async def requeue_running(self) -> int:
         async with self.pool.acquire() as conn:
             tag = await conn.execute("UPDATE submissions SET status = 'pending' WHERE status = 'running'")
+        return int(tag.rsplit(" ", 1)[1])
+
+    async def count_analyses_since(self, user_id: str, seconds: int) -> int:
+        query = """
+            SELECT COUNT(*) FROM submissions
+            WHERE analysis_requested_by = $1 AND analysis_requested_at > NOW() - make_interval(secs => $2)
+        """
+        async with self.pool.acquire() as conn:
+            return await conn.fetchval(query, user_id, seconds)
+
+    async def request_analysis(self, submission_id: UUID, user_id: str) -> dict | None:
+        """Queue an analysis of an accepted run that has never had one."""
+        query = """
+            UPDATE submissions
+            SET analysis_status = 'pending', analysis_requested_by = $2, analysis_requested_at = NOW()
+            WHERE id = $1 AND status = 'accepted' AND analysis_status IS NULL
+            RETURNING id
+        """
+        async with self.pool.acquire() as conn:
+            updated = await conn.fetchval(query, submission_id, user_id)
+        return await self.get_by_id(updated) if updated else None
+
+    async def claim_pending_analysis(self) -> dict | None:
+        query = """
+            UPDATE submissions SET analysis_status = 'running'
+            WHERE id = (
+                SELECT id FROM submissions
+                WHERE analysis_status = 'pending'
+                ORDER BY analysis_requested_at
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+            )
+            RETURNING id
+        """
+        async with self.pool.acquire() as conn:
+            submission_id = await conn.fetchval(query)
+        return await self.get_by_id(submission_id) if submission_id else None
+
+    async def complete_analysis(self, submission_id: UUID, status: str, analysis: dict) -> None:
+        query = "UPDATE submissions SET analysis_status = $2, analysis = $3::jsonb WHERE id = $1"
+        async with self.pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(query, submission_id, status, json.dumps(analysis))
+                # The room hears about it the way it hears about a verdict.
+                await conn.execute("SELECT pg_notify($1, $2)", JUDGED_CHANNEL, str(submission_id))
+
+    async def requeue_running_analyses(self) -> int:
+        async with self.pool.acquire() as conn:
+            tag = await conn.execute(
+                "UPDATE submissions SET analysis_status = 'pending' WHERE analysis_status = 'running'"
+            )
         return int(tag.rsplit(" ", 1)[1])

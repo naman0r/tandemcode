@@ -28,6 +28,18 @@ The runner starts containers through the host's Docker socket, which makes the r
 
 Without `SANDBOX_IMAGE`, the runner refuses to start unless `ALLOW_UNSANDBOXED=1` is set. Then it judges in its own process with resource limits only, which the test suite uses and nothing else should.
 
+## Complexity analysis
+
+On request, an accepted run can be rerun on inputs of growing size to estimate how its running time grows. The problem's generator (`complexity_generator`, see [CONTRIBUTING.md](../CONTRIBUTING.md)) makes the inputs, and `app/runner/complexity.py` runs the program on each size in one sandbox container.
+
+- It measures CPU time from outside the program. Counting executed lines would miss work done inside built-ins, such as `x in some_list`, and would call a quadratic brute force linear. The program also can't report a time of its own.
+- The fixed cost of every run (interpreter start, imports, reading input) is measured on a tiny input and subtracted.
+- It fits the times to a power of n and names the class. n log n measures too close to n to tell apart, so the two share a class.
+- Each analysis has a time budget, and each size a limit (`BUDGET_SECONDS` and `PER_RUN_SECONDS` in `complexity.py`). A solution that outgrows them is stopped, and the note says where.
+- The runner analyzes only when no submission is waiting, so an analysis never holds up a verdict by more than the one in progress.
+
+The result is an estimate, and the app says so. Nothing about it affects the verdict.
+
 ## Reporting a problem with it
 
 A way out of the sandbox, or a way to see or change other people's runs, is a security issue. Report it privately as described in [SECURITY.md](../SECURITY.md).

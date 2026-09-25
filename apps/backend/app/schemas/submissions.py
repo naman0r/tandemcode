@@ -34,6 +34,18 @@ class SubmissionResult(BaseModel):
     tests: list[TestOutcome]
 
 
+class ComplexityPoint(BaseModel):
+    n: int
+    ms: float
+
+
+class ComplexityAnalysis(BaseModel):
+    points: list[ComplexityPoint]
+    complexity: str | None
+    slope: float | None
+    note: str | None
+
+
 class SubmissionResponse(BaseModel):
     id: UUID
     roomId: str
@@ -49,3 +61,5 @@ class SubmissionResponse(BaseModel):
     s3KeyStderr: str | None = None
     s3KeyResultJson: str | None = None
     result: SubmissionResult | None = None
+    analysisStatus: str | None = None
+    analysis: ComplexityAnalysis | None = None

@@ -125,6 +125,22 @@ in your migration, hidden ones included. It fails if:
 - the starter code does not compile, has no `Solution` class, or passes the
   tests without being filled in
 
+### Optional: support complexity analysis
+
+An accepted run can be rerun on bigger inputs to estimate how its time grows.
+A problem supports this when its migration also sets two columns:
+
+- `complexity_generator`: Python source defining `SIZES`, the input sizes to
+  try in order, and `generate(n)`, which returns the stdin for an input of
+  size `n`. Make the inputs force a full solve, for example by putting the
+  answer at the end.
+- `expected_complexity`: the class your reference solution achieves, one of
+  `constant`, `linear`, `quadratic` or `cubic`.
+
+The test suite measures your reference solution with your generator and fails
+if it does not land in the expected class. `V13__complexity_analysis.sql` has
+examples.
+
 ### 5. Check it
 
 Run `make test`. To see the problem in the app,

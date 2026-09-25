@@ -8,7 +8,10 @@ import asyncpg
 
 # The full test list never leaves the DAO through here: only the public
 # samples do, so a client cannot read the hidden tests off the API.
-COLUMNS = "id, slug, title, difficulty, time_limit_ms, mem_limit_mb, statement, starter_code, tests"
+COLUMNS = (
+    "id, slug, title, difficulty, time_limit_ms, mem_limit_mb, statement, starter_code, tests, "
+    "complexity_generator IS NOT NULL AS analyzable, expected_complexity"
+)
 
 
 def _map_problem(row: asyncpg.Record) -> dict:
@@ -25,6 +28,8 @@ def _map_problem(row: asyncpg.Record) -> dict:
         "samples": [
             {"input": t["input"], "expected": t["expected"]} for t in tests if not t.get("hidden")
         ],
+        "analyzable": row["analyzable"],
+        "expectedComplexity": row["expected_complexity"],
     }
 
 
@@ -83,6 +88,14 @@ class ProblemDAO:
             "timeLimitMs": row["time_limit_ms"],
             "memLimitMb": row["mem_limit_mb"],
         }
+
+    async def get_analysis_spec(self, problem_id: UUID) -> dict | None:
+        query = "SELECT complexity_generator, mem_limit_mb FROM problems WHERE id = $1"
+        async with self.pool.acquire() as conn:
+            row = await conn.fetchrow(query, problem_id)
+        if row is None or row["complexity_generator"] is None:
+            return None
+        return {"generator": row["complexity_generator"], "memLimitMb": row["mem_limit_mb"]}
 
     async def exists(self, problem_id: UUID) -> bool:
         query = "SELECT EXISTS(SELECT 1 FROM problems WHERE id = $1)"
