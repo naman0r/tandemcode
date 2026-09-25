@@ -25,9 +25,20 @@ from pathlib import Path
 BUDGET_SECONDS = 6.0
 PER_RUN_SECONDS = 2.5
 ENOUGH_SECONDS = 1.0
+# Only runs shorter than this are repeated. Noise is a few tens of
+# milliseconds, which does not matter to a longer run, and the time saved
+# buys a slow solution one more size.
+REPEAT_BELOW_SECONDS = 0.5
 
-# Below this a run is mostly noise, not the solution.
+# A run counts once the solution's own time is at least the fixed cost taken
+# off it, so an error in that estimate stays a fraction of what is measured.
+# The fixed cost is some 15 ms on a laptop and 150 ms under gVisor, which also
+# reports CPU time in 10 ms steps. This is the floor where it is smaller.
 MIN_MEASURABLE_MS = 20.0
+
+# Only the largest sizes are fitted: the smaller a run, the larger the share
+# of its time that is noise and error in the fixed cost.
+FITTED_POINTS = 3
 
 # Fitted exponent of n -> growth class, split halfway between the powers.
 # n log n fits at about 1.1 over the sizes used, too close to n to tell
@@ -111,19 +122,32 @@ def analyze(code: str, generator: str, mem_limit_mb: int) -> dict:
         # and nothing more; left in, it flattens the growth of every run.
         tiny = generate(max(4, sizes[0] // 32))
         startup = min(_run(program, workdir, tiny, PER_RUN_SECONDS, mem_limit_mb)[0] or 0.0 for _ in range(3))
+        floor_ms = max(MIN_MEASURABLE_MS, startup * 1000)
 
         for n in sizes:
             remaining = BUDGET_SECONDS - spent
             if remaining <= 0.1:
                 note = f"Stopped before n = {n}: out of time for this analysis."
                 break
-            seconds, failure = _run(program, workdir, generate(n), min(PER_RUN_SECONDS, remaining), mem_limit_mb)
+            stdin = generate(n)
+            seconds, failure = _run(program, workdir, stdin, min(PER_RUN_SECONDS, remaining), mem_limit_mb)
             if seconds is None:
                 note = f"Stopped at n = {n}: it {failure}."
                 break
             spent += seconds
+            # Scheduling only ever makes a run slower, so a short measurable
+            # size is run twice and the faster run kept.
+            if (
+                (seconds - startup) * 1000 >= floor_ms
+                and seconds < REPEAT_BELOW_SECONDS
+                and BUDGET_SECONDS - spent > seconds
+            ):
+                again, _ = _run(program, workdir, stdin, min(PER_RUN_SECONDS, BUDGET_SECONDS - spent), mem_limit_mb)
+                if again is not None:
+                    spent += again
+                    seconds = min(seconds, again)
             ms = (seconds - startup) * 1000
-            if ms >= MIN_MEASURABLE_MS:
+            if ms >= floor_ms:
                 points.append((n, ms))
             if seconds >= ENOUGH_SECONDS:
                 break
@@ -135,7 +159,7 @@ def analyze(code: str, generator: str, mem_limit_mb: int) -> dict:
         "note": note,
     }
     if len(points) >= 2:
-        result["complexity"], slope = classify(points)
+        result["complexity"], slope = classify(points[-FITTED_POINTS:])
         result["slope"] = round(slope, 2)
         if len(points) == 2:
             result["note"] = (note + " " if note else "") + "Only two sizes were measurable, so this is rough."

@@ -33,8 +33,8 @@ Without `SANDBOX_IMAGE`, the runner refuses to start unless `ALLOW_UNSANDBOXED=1
 On request, an accepted run can be rerun on inputs of growing size to estimate how its running time grows. The problem's generator (`complexity_generator`, see [CONTRIBUTING.md](../CONTRIBUTING.md)) makes the inputs, and `app/runner/complexity.py` runs the program on each size in one sandbox container.
 
 - It measures CPU time from outside the program. Counting executed lines would miss work done inside built-ins, such as `x in some_list`, and would call a quadratic brute force linear. The program also can't report a time of its own.
-- The fixed cost of every run (interpreter start, imports, reading input) is measured on a tiny input and subtracted.
-- It fits the times to a power of n and names the class. n log n measures too close to n to tell apart, so the two share a class.
+- The fixed cost of every run (interpreter start, imports, reading input) is measured on a tiny input and subtracted. Under gVisor it is some 150 ms, ten times a laptop's, and gVisor reports CPU time in 10 ms steps, so a size only counts once the solution's own time is at least that fixed cost. Short runs are timed twice and the faster kept, since scheduling only ever adds time.
+- It fits the largest measurable sizes (`FITTED_POINTS`) to a power of n and names the class. n log n measures too close to n to tell apart, so the two share a class.
 - Each analysis has a time budget, and each size a limit (`BUDGET_SECONDS` and `PER_RUN_SECONDS` in `complexity.py`). A solution that outgrows them is stopped, and the note says where.
 - The runner analyzes only when no submission is waiting, so an analysis never holds up a verdict by more than the one in progress.
 
