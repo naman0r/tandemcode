@@ -75,15 +75,16 @@ const ComplexityPanel = ({ submission, expected }: { submission: Submission; exp
     const measured = CLASSES.indexOf(analysis.complexity);
     const target = expected ? CLASSES.indexOf(expected) : -1;
     const slower = target >= 0 && measured > target;
+    const verdict = target < 0 ? null : measured > target ? "Slower than" : measured < target ? "Faster than" : "Matches";
     return (
       <div className="space-y-3 border-t-2 border-zinc-800 px-4 py-3 text-sm">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           <span className={`font-pixel text-3xl leading-none ${slower ? "text-amber-300" : "text-emerald-400"}`}>
             <Label name={analysis.complexity} />
           </span>
-          {expected && (
+          {expected && verdict && (
             <span className={muted}>
-              {slower ? "Slower than" : "Matches"} the expected {LABEL[expected]}
+              {verdict} the expected {LABEL[expected]}
             </span>
           )}
         </div>
