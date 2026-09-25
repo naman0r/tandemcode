@@ -13,7 +13,7 @@ jobs:
   links:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # Relative links only: a moved or deleted file fails the build, and an
       # outside site being down does not.
       - uses: lycheeverse/lychee-action@v2
