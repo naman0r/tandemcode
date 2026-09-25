@@ -17,6 +17,8 @@ SUPPORTED_LANGUAGES = {"python"}
 # The runner is one process judging one run at a time. A pair practising
 # hard stays well under this; a script holding the runner does not.
 RUNS_PER_HOUR = 120
+# An analysis costs the runner several seconds, a run well under one.
+ANALYSES_PER_HOUR = 20
 
 
 class SubmissionService:
@@ -96,6 +98,52 @@ class SubmissionService:
         room = await get_active_room(self.room_dao, submission["roomId"])
         await ensure_room_member(self.room_member_dao, room, caller_id)
         return submission
+
+    async def request_analysis(self, submission_id, caller_id: str) -> dict:
+        submission = await self.submission_dao.get_by_id(submission_id)
+        if not submission:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Submission not found: {submission_id}",
+            )
+        room_id = submission["roomId"]
+        await get_active_room(self.room_dao, room_id)
+        if not await self.room_member_dao.is_present(room_id, caller_id):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Join the room to analyze runs in it",
+            )
+        # A wrong answer's timings describe a program that does not solve
+        # the problem, so they say nothing useful.
+        if submission["status"] != "accepted":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Only accepted runs can be analyzed",
+            )
+        problem = await self.problem_dao.get_by_id(submission["problemId"])
+        if not problem or not problem["analyzable"]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This problem does not support complexity analysis yet",
+            )
+        # Both people in a room can press the button; the second press sees
+        # the first one's analysis instead of queueing another.
+        if submission["analysisStatus"] in ("pending", "running", "done"):
+            return submission
+        if await self.submission_dao.count_analyses_since(caller_id, 3600) >= ANALYSES_PER_HOUR:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many analyses this hour. Try again later.",
+            )
+        try:
+            queued = await self.submission_dao.request_analysis(submission_id, caller_id)
+        except asyncpg.UniqueViolationError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Wait for your current analysis to finish",
+            ) from exc
+        # None means someone else queued it between the read and the update.
+        return queued or await self.submission_dao.get_by_id(submission_id)
 
     async def list_submissions(self, room_id: str, caller_id: str, user_id: str | None = None) -> list[dict]:
         room = await get_active_room(self.room_dao, room_id)

@@ -43,6 +43,21 @@ async def list_submissions(
     return [SubmissionResponse.model_validate(submission) for submission in submissions]
 
 
+@router.post("/{submission_id}/analysis", response_model=SubmissionResponse)
+async def request_analysis(
+    submission_id: UUID,
+    request: Request,
+    caller_id: str = Depends(current_user_id),
+    service: SubmissionService = Depends(get_submission_service),
+) -> SubmissionResponse:
+    submission = await service.request_analysis(submission_id, caller_id)
+    # Everyone in the room sees it start; the result follows from the listener.
+    await request.app.state.room_chat_manager.broadcast(
+        submission["roomId"], {"type": "submission", "submission": submission}
+    )
+    return SubmissionResponse.model_validate(submission)
+
+
 @router.get("/{submission_id}", response_model=SubmissionResponse)
 async def get_submission(
     submission_id: UUID,

@@ -37,6 +37,8 @@ Rooms are public or unlisted, and the owner can ask for a partner, which highlig
 2. The runner (`app/runner/__main__.py`) claims the oldest pending submission, judges it (see [judge and sandbox](judge-and-sandbox.md)), and stores the verdict.
 3. Storing a verdict sends a Postgres `NOTIFY`. The API listens for it (`app/websocket/verdicts.py`) and broadcasts the verdict to the room.
 
+Complexity analysis of an accepted run (`POST /api/submissions/{id}/analysis`) goes through the same queue and the same notification, and the runner takes it only when no submission is waiting. See [judge and sandbox](judge-and-sandbox.md).
+
 The runner polls for work and handles one submission at a time. A submission left running by a runner that died is put back in the queue when a runner starts.
 
 ## Replay

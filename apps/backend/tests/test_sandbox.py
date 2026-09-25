@@ -8,7 +8,7 @@ import subprocess
 import pytest
 
 from app.runner.judge import ACCEPTED, RUNTIME_ERROR
-from app.runner.sandbox import judge_in_container, pull
+from app.runner.sandbox import analyze_in_container, judge_in_container, pull
 
 IMAGE = "python:3.11-slim"
 
@@ -57,3 +57,10 @@ def test_program_cannot_write_to_the_judges_stdout():
     verdict = judge_in_container(IMAGE, code, TESTS, 2000, 128)
     assert verdict.status == RUNTIME_ERROR
     assert "PermissionError" in verdict.tests[0].stderr
+
+
+def test_growth_is_measured_in_the_container():
+    code = "n = int(input())\ntotal = 0\nfor i in range(n):\n    total += i\nprint(total)\n"
+    generator = "SIZES = [20000 * 2 ** k for k in range(10)]\ndef generate(n):\n    return f'{n}\\n'\n"
+    result = analyze_in_container(IMAGE, code, generator, 128)
+    assert result["complexity"] == "linear", result

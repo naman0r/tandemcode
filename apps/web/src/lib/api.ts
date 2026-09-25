@@ -124,6 +124,12 @@ export const submissionApi = {
     return response.data;
   },
 
+  // The result arrives over the room socket, like a verdict.
+  requestAnalysis: async (id: string) => {
+    const response = await api.post(`/submissions/${id}/analysis`);
+    return response.data;
+  },
+
   getSubmissionsForRoom: async (roomId: string, userId?: string) => {
     const params = userId ? { userId } : {};
     const response = await api.get(`/submissions/room/${roomId}`, { params });

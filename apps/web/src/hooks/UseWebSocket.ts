@@ -33,10 +33,20 @@ export interface TestOutcome {
 export interface Submission {
   id: string;
   userId: string;
+  problemId: string;
   userName: string | null;
   status: string;
   createdAt: string;
   result: { passed: number; total: number; timeMs: number; tests: TestOutcome[] } | null;
+  analysisStatus?: "pending" | "running" | "done" | "failed" | null;
+  analysis?: ComplexityAnalysis | null;
+}
+
+export interface ComplexityAnalysis {
+  points: { n: number; ms: number }[];
+  complexity: string | null;
+  slope: number | null;
+  note: string | null;
 }
 
 // Newest first; a submission arrives once as pending and again judged.
