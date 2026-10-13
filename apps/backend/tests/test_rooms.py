@@ -327,8 +327,15 @@ def test_room_creation_limit_holds_under_parallel_requests(client, signed_up):
 
     async def burst():
         return await asyncio.gather(
-            *(dao.create(str(uuid4()), "r", None, "user_grace", "public", False, 3, 30) for _ in range(20))
+            *(dao.create(str(uuid4()), "r", None, "user_grace", "public", False, "code", 3, 30) for _ in range(20))
         )
 
     assert sum(room is not None for room in client.portal.call(burst)) == 3
 
+
+
+def test_a_room_is_for_code_unless_asked_for_design(client, room):
+    assert room["kind"] == "code"
+    design = client.post("/api/rooms", json={"name": "d", "kind": "design"}, headers=auth("user_alice"))
+    assert design.json()["kind"] == "design"
+    assert client.post("/api/rooms", json={"name": "x", "kind": "slides"}, headers=auth("user_alice")).status_code == 422

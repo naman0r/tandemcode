@@ -10,6 +10,7 @@ from app.schemas.submissions import SubmissionResponse
 
 
 Visibility = Literal["public", "unlisted"]
+Kind = Literal["code", "design"]
 
 
 class RoomListing(BaseModel):
@@ -29,6 +30,7 @@ class CreateRoomRequest(RoomListing):
     description: str | None = Field(default=None, max_length=500)
     visibility: Visibility = "public"
     advertised: bool = False
+    kind: Kind = "code"
 
 
 class SetProblemRequest(BaseModel):
@@ -50,6 +52,7 @@ class RoomResponse(BaseModel):
     currentProblemId: UUID | None = None
     visibility: Visibility
     advertised: bool
+    kind: Kind
     memberCount: int
 
 
