@@ -9,12 +9,15 @@ import * as encoding from "lib0/encoding";
 import { readSyncMessage } from "y-protocols/sync";
 import Layout from "../../components/Layout";
 import RequireSignIn from "../../components/RequireSignIn";
+import { Sketch } from "../../components/Whiteboard";
+import type { Shape } from "../../components/Whiteboard";
 import { roomApi } from "../../lib/api";
+import type { RoomKind } from "../../lib/api";
 import { EDITOR_THEME, defineEditorTheme } from "../../lib/monaco";
 import { button, card, eyebrow, heading, muted, title } from "../../lib/ui";
 
 type Replay = {
-  room: { id: string; name: string; description: string | null; createdByName: string | null; createdAt: string };
+  room: { id: string; name: string; description: string | null; createdByName: string | null; createdAt: string; kind: RoomKind };
   updates: { ts: string; data: string }[];
   events: { ts: string; type: string; payload: { username?: string; text?: string } }[];
   submissions: { id: string; userName: string | null; status: string; createdAt: string; result: { passed: number; total: number } | null }[];
@@ -54,8 +57,17 @@ const Timeline = ({ replay }: { replay: Replay }) => {
   const appliedRef = useRef(0);
   const [position, setPosition] = useState(replay.updates.length);
   const [playing, setPlaying] = useState(false);
+  const [shapes, setShapes] = useState<Shape[]>([]);
+  const design = replay.room.kind === "design";
 
   const frames = useMemo(() => replay.updates.map((update) => decode(update.data)), [replay.updates]);
+  // The whole session's board, so the frame holds still while shapes appear.
+  const finalShapes = useMemo(() => {
+    if (!design) return [];
+    const doc = new Y.Doc();
+    frames.forEach((frame) => applyFramed(doc, frame));
+    return Array.from(doc.getMap<Shape>("board").values());
+  }, [design, frames]);
   const startedAt = new Date(replay.room.createdAt).getTime();
 
   const moments = useMemo<Moment[]>(() => {
@@ -83,6 +95,7 @@ const Timeline = ({ replay }: { replay: Replay }) => {
       appliedRef.current += 1;
     }
     editorRef.current?.setValue(docRef.current.getText("code").toString());
+    setShapes(Array.from(docRef.current.getMap<Shape>("board").values()));
   }, [position, frames]);
 
   useEffect(() => {
@@ -129,17 +142,21 @@ const Timeline = ({ replay }: { replay: Replay }) => {
             {clock(now - startedAt)} · {position}/{frames.length}
           </span>
         </div>
-        <Editor
-          height="480px"
-          defaultLanguage="python"
-          theme={EDITOR_THEME}
-          beforeMount={defineEditorTheme}
-          onMount={(editor) => {
-            editorRef.current = editor;
-            editor.setValue(docRef.current.getText("code").toString());
-          }}
-          options={{ readOnly: true, minimap: { enabled: false }, fontSize: 14, scrollBeyondLastLine: false, automaticLayout: true, padding: { top: 12, bottom: 12 }, wordWrap: "on" }}
-        />
+        {design ? (
+          <Sketch shapes={shapes} fit={finalShapes} />
+        ) : (
+          <Editor
+            height="480px"
+            defaultLanguage="python"
+            theme={EDITOR_THEME}
+            beforeMount={defineEditorTheme}
+            onMount={(editor) => {
+              editorRef.current = editor;
+              editor.setValue(docRef.current.getText("code").toString());
+            }}
+            options={{ readOnly: true, minimap: { enabled: false }, fontSize: 14, scrollBeyondLastLine: false, automaticLayout: true, padding: { top: 12, bottom: 12 }, wordWrap: "on" }}
+          />
+        )}
       </section>
 
       <section className={`${card} p-4`}>
