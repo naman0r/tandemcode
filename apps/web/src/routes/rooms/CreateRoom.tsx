@@ -124,7 +124,7 @@ const CreateRoomForm = () => {
         description: description.trim(),
         visibility,
         advertised: visibility === "public" && advertised,
-        kind: problem ? "code" : kind,
+        kind: problemId ? "code" : kind,
       });
       // The room exists either way; a problem can still be picked inside it.
       if (problem) {
@@ -159,7 +159,7 @@ const CreateRoomForm = () => {
         </div>
       )}
 
-      {!problem && <Options legend="What for" name="kind" options={KIND_OPTIONS} value={kind} onChange={setKind} />}
+      {!problemId && <Options legend="What for" name="kind" options={KIND_OPTIONS} value={kind} onChange={setKind} />}
 
       <label className="block text-sm">
         <span className="mb-1 block font-medium">Name</span>
