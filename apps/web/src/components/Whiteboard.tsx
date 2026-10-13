@@ -3,12 +3,41 @@ import type { KeyboardEvent, MouseEvent, PointerEvent } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
-import { Circle, Diamond, Hand, Minus, MousePointer2, MoveUpRight, Pencil, Redo2, Square, Type, Undo2 } from "lucide-react";
+import {
+  Circle,
+  Cloud,
+  Database,
+  Diamond,
+  Hand,
+  Hexagon,
+  Minus,
+  MousePointer2,
+  MoveUpRight,
+  Pencil,
+  Redo2,
+  Square,
+  Triangle,
+  Type,
+  Undo2,
+  User,
+} from "lucide-react";
 import { WS_BASE_URL } from "../lib/config";
 
 export type Shape = {
   id: string;
-  type: "rect" | "diamond" | "ellipse" | "arrow" | "line" | "draw" | "text";
+  type:
+    | "rect"
+    | "diamond"
+    | "ellipse"
+    | "hexagon"
+    | "triangle"
+    | "database"
+    | "cloud"
+    | "person"
+    | "arrow"
+    | "line"
+    | "draw"
+    | "text";
   // An arrow or line runs from (x, y) by (w, h). A drawing is `points`, flat
   // x, y pairs relative to (x, y). Every other shape is a box with w, h >= 0.
   x: number;
@@ -24,9 +53,12 @@ export type Shape = {
 type Tool = "select" | "hand" | Shape["type"];
 type View = { x: number; y: number; zoom: number };
 type Peer = { key: number; id: string; name: string; x: number; y: number };
+// Box handles are named for the side or corner they drag; lines have two ends.
+type Handle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | "start" | "end";
 type Gesture =
   | { kind: "pan"; clientX: number; clientY: number; view: View }
   | { kind: "move" | "draw"; x: number; y: number; shape: Shape }
+  | { kind: "resize"; x: number; y: number; shape: Shape; handle: Handle }
   | { kind: "text" };
 
 interface Props {
@@ -35,12 +67,17 @@ interface Props {
   colorOf: (userId: string) => string;
 }
 
-const TOOLS: { tool: Tool; icon: typeof Square; label: string; key: string }[] = [
+const TOOLS: { tool: Tool; icon: typeof Square; label: string; key?: string }[] = [
   { tool: "hand", icon: Hand, label: "Pan", key: "h" },
   { tool: "select", icon: MousePointer2, label: "Select", key: "v" },
   { tool: "rect", icon: Square, label: "Rectangle", key: "r" },
   { tool: "diamond", icon: Diamond, label: "Diamond", key: "d" },
   { tool: "ellipse", icon: Circle, label: "Ellipse", key: "o" },
+  { tool: "hexagon", icon: Hexagon, label: "Hexagon" },
+  { tool: "triangle", icon: Triangle, label: "Triangle" },
+  { tool: "database", icon: Database, label: "Database" },
+  { tool: "cloud", icon: Cloud, label: "Cloud" },
+  { tool: "person", icon: User, label: "Person" },
   { tool: "arrow", icon: MoveUpRight, label: "Arrow", key: "a" },
   { tool: "line", icon: Minus, label: "Line", key: "l" },
   { tool: "draw", icon: Pencil, label: "Draw", key: "p" },
@@ -66,6 +103,18 @@ const TOKEN_REFRESH_MS = 30_000;
 const WS_URL = `${WS_BASE_URL}/ws/yjs`;
 
 const CURSORS: Partial<Record<Tool, string>> = { hand: "grab", select: "default", text: "text" };
+const HANDLE_CURSORS: Record<Handle, string> = {
+  nw: "nwse-resize",
+  se: "nwse-resize",
+  ne: "nesw-resize",
+  sw: "nesw-resize",
+  n: "ns-resize",
+  s: "ns-resize",
+  e: "ew-resize",
+  w: "ew-resize",
+  start: "move",
+  end: "move",
+};
 
 const toolbar = "px-box absolute flex bg-zinc-900 [--px:#3f3f46]";
 const toolButton = (on: boolean) =>
@@ -92,19 +141,34 @@ const edge = (x1: number, y1: number, x2: number, y2: number, rand: () => number
   return `M${x1 + j()} ${y1 + j()}C${x1 + dx / 3 + j()} ${y1 + dy / 3 + j()} ${x1 + (dx * 2) / 3 + j()} ${y1 + (dy * 2) / 3 + j()} ${x2 + j()} ${y2 + j()}`;
 };
 
-// A smooth curve through jittered points on the ellipse, running a little past
-// where it started, as a hand would.
-const loop = (cx: number, cy: number, rx: number, ry: number, rand: () => number) => {
-  const steps = 16;
-  const start = rand() * Math.PI * 2;
+// A smooth curve through jittered points on an ellipse, from `start` through
+// `sweep` radians.
+const arc = (cx: number, cy: number, rx: number, ry: number, start: number, sweep: number, rand: () => number) => {
+  const steps = Math.max(4, Math.round((16 * sweep) / (Math.PI * 2)));
   const points = Array.from({ length: steps + 2 }, (_, i) => {
-    const angle = start + (i * Math.PI * 2 * 1.06) / steps;
+    const angle = start + ((i - 0.5) * sweep) / steps;
     const k = 1 + (rand() - 0.5) * 0.06;
     return [cx + Math.cos(angle) * rx * k, cy + Math.sin(angle) * ry * k];
   });
   const mid = (a: number[], b: number[]) => `${(a[0] + b[0]) / 2} ${(a[1] + b[1]) / 2}`;
   let path = `M${mid(points[0], points[1])}`;
   for (let i = 1; i < points.length - 1; i++) path += `Q${points[i][0]} ${points[i][1]} ${mid(points[i], points[i + 1])}`;
+  return path;
+};
+
+// A whole ellipse that runs a little past where it started, as a hand would.
+const loop = (cx: number, cy: number, rx: number, ry: number, rand: () => number) =>
+  arc(cx, cy, rx, ry, rand() * Math.PI * 2, Math.PI * 2 * 1.06, rand);
+
+// Scallops bulging out from an ellipse inset enough that their peaks meet the box.
+const cloud = (cx: number, cy: number, rx: number, ry: number, rand: () => number) => {
+  const bumps = 8;
+  const at = (angle: number, k: number) => `${cx + Math.cos(angle) * rx * k} ${cy + Math.sin(angle) * ry * k}`;
+  const angle = (i: number) => (i * Math.PI * 2) / bumps;
+  let path = `M${at(0, 0.9)}`;
+  for (let i = 0; i < bumps; i++) {
+    path += `Q${at(angle(i + 0.5), 1.3 + (rand() - 0.5) * 0.1)} ${at(angle(i + 1), i === bumps - 1 ? 0.9 : 0.9 + (rand() - 0.5) * 0.05)}`;
+  }
   return path;
 };
 
@@ -131,6 +195,47 @@ const outline = (shape: Shape): string => {
     ]);
   }
   if (shape.type === "ellipse") return twice(() => loop(x + w / 2, y + h / 2, w / 2, h / 2, rand));
+  if (shape.type === "hexagon") {
+    return polygon([
+      [x + w / 4, y],
+      [x + (w * 3) / 4, y],
+      [x + w, y + h / 2],
+      [x + (w * 3) / 4, y + h],
+      [x + w / 4, y + h],
+      [x, y + h / 2],
+    ]);
+  }
+  if (shape.type === "triangle") {
+    return polygon([
+      [x + w / 2, y],
+      [x + w, y + h],
+      [x, y + h],
+    ]);
+  }
+  if (shape.type === "database") {
+    const ry = Math.min(h / 4, w / 6);
+    return twice(
+      () =>
+        loop(x + w / 2, y + ry, w / 2, ry, rand) +
+        edge(x, y + ry, x, y + h - ry, rand) +
+        edge(x + w, y + ry, x + w, y + h - ry, rand) +
+        arc(x + w / 2, y + h - ry, w / 2, ry, 0, Math.PI, rand),
+    );
+  }
+  if (shape.type === "cloud") return twice(() => cloud(x + w / 2, y + h / 2, w / 2, h / 2, rand));
+  if (shape.type === "person") {
+    const r = Math.min(w / 4, h / 6);
+    const hip = y + h * 0.65;
+    const arms = y + 2 * r + h * 0.12;
+    return twice(
+      () =>
+        loop(x + w / 2, y + r, r, r, rand) +
+        edge(x + w / 2, y + 2 * r, x + w / 2, hip, rand) +
+        edge(x + w * 0.1, arms, x + w * 0.9, arms, rand) +
+        edge(x + w / 2, hip, x + w * 0.15, y + h, rand) +
+        edge(x + w / 2, hip, x + w * 0.85, y + h, rand),
+    );
+  }
   if (shape.type === "line") return twice(() => edge(x, y, x + w, y + h, rand));
   if (shape.type === "arrow") {
     const angle = Math.atan2(h, w);
@@ -170,6 +275,58 @@ const box = (shape: Shape) => {
 // Lines, arrows and drawings are hit along their stroke, not across their box.
 const stroked = (shape: Shape) => shape.type === "arrow" || shape.type === "line" || shape.type === "draw";
 
+// Where a shape's text sits: free text from its top left, a person's name
+// under the figure, any other label in the middle.
+const labelAt = (shape: Shape) => {
+  const { x, y, w, h } = box(shape);
+  if (shape.type === "text") return { x, y };
+  return { x: x + w / 2, y: shape.type === "person" ? y + h + LINE * 0.7 : y + h / 2 };
+};
+
+// Text keeps its font size, so it has no handles.
+const handles = (shape: Shape, pad: number): [Handle, number, number][] => {
+  if (shape.type === "arrow" || shape.type === "line") {
+    return [
+      ["start", shape.x, shape.y],
+      ["end", shape.x + shape.w, shape.y + shape.h],
+    ];
+  }
+  if (shape.type === "text") return [];
+  const { x, y, w, h } = box(shape);
+  const [left, top, right, bottom] = [x - pad, y - pad, x + w + pad, y + h + pad];
+  const [midX, midY] = [x + w / 2, y + h / 2];
+  return [
+    ["nw", left, top],
+    ["n", midX, top],
+    ["ne", right, top],
+    ["e", right, midY],
+    ["se", right, bottom],
+    ["s", midX, bottom],
+    ["sw", left, bottom],
+    ["w", left, midY],
+  ];
+};
+
+const resize = (shape: Shape, handle: Handle, dx: number, dy: number): Shape => {
+  if (handle === "start") return { ...shape, x: shape.x + dx, y: shape.y + dy, w: shape.w - dx, h: shape.h - dy };
+  if (handle === "end") return { ...shape, w: shape.w + dx, h: shape.h + dy };
+  const old = box(shape);
+  let [left, top, right, bottom] = [old.x, old.y, old.x + old.w, old.y + old.h];
+  if (handle.includes("w")) left += dx;
+  if (handle.includes("e")) right += dx;
+  if (handle.includes("n")) top += dy;
+  if (handle.includes("s")) bottom += dy;
+  const next = { x: Math.min(left, right), y: Math.min(top, bottom), w: Math.abs(right - left), h: Math.abs(bottom - top) };
+  if (!shape.points) return { ...shape, ...next };
+  // A drawing stretches its points into the new box, relative to its corner.
+  const sx = old.w ? next.w / old.w : 1;
+  const sy = old.h ? next.h / old.h : 1;
+  const points = shape.points.map((p, i) =>
+    i % 2 ? Math.round((shape.y + p - old.y) * sy) : Math.round((shape.x + p - old.x) * sx),
+  );
+  return { ...shape, x: next.x, y: next.y, points };
+};
+
 const lines = (text: string) => text.split("\n");
 
 const textSize = (text: string) => ({
@@ -208,15 +365,7 @@ const ShapeView = memo(({ shape }: { shape: Shape }) => {
         <rect x={x} y={y} width={w} height={h} fill="transparent" />
       )}
       <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      {shape.text && (
-        <Label
-          text={shape.text}
-          x={shape.type === "text" ? x : x + w / 2}
-          y={shape.type === "text" ? y : y + h / 2}
-          centered={shape.type !== "text"}
-          color={color}
-        />
-      )}
+      {shape.text && <Label text={shape.text} {...labelAt(shape)} centered={shape.type !== "text"} color={color} />}
     </g>
   );
 });
@@ -370,6 +519,15 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
     } else if (event.button !== 0) {
       return;
     } else if (tool === "select") {
+      const handle = document
+        .elementFromPoint(event.clientX, event.clientY)
+        ?.closest("[data-handle]")
+        ?.getAttribute("data-handle") as Handle | undefined;
+      const picked = selected ? board.shapes.get(selected) : undefined;
+      if (handle && picked) {
+        gesture.current = { kind: "resize", ...point, shape: picked, handle };
+        return;
+      }
       const id = hit(event);
       const shape = id ? board.shapes.get(id) : undefined;
       setSelected(id);
@@ -399,6 +557,8 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
     const current = gesture.current;
     if (current?.kind === "pan") {
       setView({ ...current.view, x: current.view.x + event.clientX - current.clientX, y: current.view.y + event.clientY - current.clientY });
+    } else if (current?.kind === "resize") {
+      setDraft(resize(current.shape, current.handle, point.x - current.x, point.y - current.y));
     } else if (current?.kind === "move") {
       setDraft({ ...current.shape, x: current.shape.x + point.x - current.x, y: current.shape.y + point.y - current.y });
     } else if (current?.kind === "draw" && current.shape.points) {
@@ -428,6 +588,8 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
       setSelected(draft.id);
       setTool("select");
     }
+    // A resize only has a draft once the pointer has moved.
+    if (board && draft && current?.kind === "resize") board.shapes.set(draft.id, draft);
     if (board && draft && current?.kind === "move" && (draft.x !== current.shape.x || draft.y !== current.shape.y)) {
       board.shapes.set(draft.id, draft);
     }
@@ -474,7 +636,7 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
   const selection = draft ?? shapes.find((shape) => shape.id === selected);
   const selectionBox = selection && box(selection);
   const pad = 6 / view.zoom;
-  const editingBox = editing && box(editing);
+  const editingAt = editing && labelAt(editing);
   const editingSize = editing && textSize(editing.text || " ");
 
   return (
@@ -521,6 +683,22 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
               pointerEvents="none"
             />
           )}
+          {selection &&
+            tool === "select" &&
+            handles(selection, pad).map(([handle, hx, hy]) => (
+              <rect
+                key={handle}
+                data-handle={handle}
+                x={hx - 5 / view.zoom}
+                y={hy - 5 / view.zoom}
+                width={10 / view.zoom}
+                height={10 / view.zoom}
+                fill="#0a0a0b"
+                stroke="#f97316"
+                strokeWidth={1.5 / view.zoom}
+                style={{ cursor: HANDLE_CURSORS[handle] }}
+              />
+            ))}
           {peers.map((peer) => (
             <g key={peer.key} transform={`translate(${peer.x} ${peer.y}) scale(${1 / view.zoom})`} pointerEvents="none">
               <path d="M0 0L0 17L4.5 13L8 20L11 19L7.5 12L13 12Z" fill={colorOf(peer.id)} stroke="#0a0a0b" />
@@ -539,7 +717,7 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
         </p>
       )}
 
-      {editing && editingBox && editingSize && (
+      {editing && editingAt && editingSize && (
         <textarea
           autoFocus
           value={editing.text}
@@ -555,10 +733,8 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
             width: (editingSize.w + CHAR) * view.zoom,
             height: editingSize.h * view.zoom,
             textAlign: editing.type === "text" ? "left" : "center",
-            left:
-              view.x +
-              (editing.type === "text" ? editingBox.x : editingBox.x + editingBox.w / 2 - (editingSize.w + CHAR) / 2) * view.zoom,
-            top: view.y + (editing.type === "text" ? editingBox.y : editingBox.y + editingBox.h / 2 - editingSize.h / 2) * view.zoom,
+            left: view.x + (editing.type === "text" ? editingAt.x : editingAt.x - (editingSize.w + CHAR) / 2) * view.zoom,
+            top: view.y + (editing.type === "text" ? editingAt.y : editingAt.y - editingSize.h / 2) * view.zoom,
           }}
         />
       )}
@@ -568,7 +744,7 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
           <button
             key={item}
             type="button"
-            title={`${label} (${shortcut.toUpperCase()})`}
+            title={shortcut ? `${label} (${shortcut.toUpperCase()})` : label}
             aria-label={label}
             aria-pressed={tool === item}
             onClick={() => setTool(item)}
