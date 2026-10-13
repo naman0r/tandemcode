@@ -25,7 +25,7 @@ async def create_room(
     service: RoomService = Depends(get_room_service),
 ) -> RoomResponse:
     room = await service.create_room(
-        payload.name, payload.description, user_id, payload.visibility, payload.advertised
+        payload.name, payload.description, user_id, payload.visibility, payload.advertised, payload.kind
     )
     return RoomResponse.model_validate(room)
 

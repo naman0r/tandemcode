@@ -7,12 +7,13 @@ import RoomChatComponent from "../../components/RoomChatComponent";
 import RoomMembersPanel from "../../components/RoomMembersPanel";
 import CollaborativeEditor from "../../components/CollaborativeEditor";
 import ComplexityPanel from "../../components/ComplexityPanel";
+import Whiteboard from "../../components/Whiteboard";
 import InviteButton from "../../components/InviteButton";
 import { useUser } from "../../hooks/useUser";
 import useWebSocket from "../../hooks/UseWebSocket";
 import type { Submission } from "../../hooks/UseWebSocket";
 import { problemApi, roomApi, submissionApi } from "../../lib/api";
-import type { RoomVisibility } from "../../lib/api";
+import type { RoomKind, RoomVisibility } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
 import { badge, button, card, difficulty, heading, muted, personColor, title } from "../../lib/ui";
 
@@ -39,6 +40,7 @@ type Room = {
   currentProblemId: string | null;
   visibility: RoomVisibility;
   advertised: boolean;
+  kind: RoomKind;
 };
 
 const PENDING_STATUSES = new Set(["pending", "running"]);
@@ -407,6 +409,7 @@ const Room = ({ roomId }: { roomId: string }) => {
         <div>
           <h1 className={`${title} flex flex-wrap items-center gap-3 text-4xl!`}>
             {room.name}
+            {room.kind === "design" && <span className={badge(undefined)}>System design</span>}
             {room.visibility === "unlisted" && <span className={badge(undefined)}>Unlisted</span>}
           </h1>
           <p className={`${muted} mt-2 text-sm`}>
@@ -426,95 +429,103 @@ const Room = ({ roomId }: { roomId: string }) => {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
-          <section className={`${card} overflow-hidden`}>
-            <div className="flex items-center justify-between border-b-4 border-zinc-800 px-4 py-2">
-              <span className={`${muted} font-pixel text-lg`}>Python 3.11</span>
-              <button
-                type="button"
-                onClick={run}
-                disabled={running || !problem}
-                title={problem ? "" : "Choose a problem first"}
-                className={button.primary}
-              >
-                {running ? "Running..." : "Run tests"}
-              </button>
-            </div>
-            {user && (
-              <CollaborativeEditor
-                roomId={roomId}
-                user={{ id: user.id, name: user.name || "Someone" }}
-                problemId={problem?.id}
-                starterCode={problem?.starterCode}
-                replacesOnProblemChange={isOwner}
-                writesStarter={isOwner || starterWriter === user.id}
-                onCodeChange={setCode}
-                colorOf={colorOf}
-              />
-            )}
-            {runError && (
-              <p className="border-t-2 border-zinc-800 px-4 py-2 text-sm text-red-300">
-                {runError}
-              </p>
-            )}
-            {shown && <VerdictPanel submission={shown} color={colorOf(shown.userId)} />}
-            {shown?.status === "accepted" && problem?.analyzable && shown.problemId === problem.id && (
-              <ComplexityPanel submission={shown} expected={problem.expectedComplexity} />
-            )}
+        {room.kind === "design" ? (
+          <section className={`${card} overflow-hidden lg:col-span-2`}>
+            {user && <Whiteboard roomId={roomId} user={{ id: user.id, name: user.name || "Someone" }} colorOf={colorOf} />}
           </section>
-
-          <section className={`${card} p-5`}>
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className={`${heading} flex flex-wrap items-center gap-2`}>
-                {problem ? problem.title : "No problem chosen"}
-                {problem && <span className={badge(difficulty[problem.difficulty])}>{problem.difficulty}</span>}
-              </h2>
-              {isOwner && (
-                <button type="button" onClick={() => setPicking(true)} className={button.secondary}>
-                  {problem ? "Change" : "Choose a problem"}
+        ) : (
+          <div className="space-y-6 lg:col-span-2">
+            <section className={`${card} overflow-hidden`}>
+              <div className="flex items-center justify-between border-b-4 border-zinc-800 px-4 py-2">
+                <span className={`${muted} font-pixel text-lg`}>Python 3.11</span>
+                <button
+                  type="button"
+                  onClick={run}
+                  disabled={running || !problem}
+                  title={problem ? "" : "Choose a problem first"}
+                  className={button.primary}
+                >
+                  {running ? "Running..." : "Run tests"}
                 </button>
-              )}
-            </div>
-
-            {!problem && (
-              <p className={`${muted} text-sm`}>
-                {isOwner ? "Choose a problem to get started." : "Waiting for the room owner to choose a problem."}
-              </p>
-            )}
-
-            {problem && (
-              <div className="space-y-4 text-sm">
-                <p className="whitespace-pre-line">
-                  {problem.statement ?? "This problem has no statement or tests yet."}
-                </p>
-                {problem.samples.map((sample, index) => (
-                  <div key={index} className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <p className={`${muted} mb-1 text-xs`}>Sample input {index + 1}</p>
-                      <pre className={pre}>{sample.input}</pre>
-                    </div>
-                    <div>
-                      <p className={`${muted} mb-1 text-xs`}>Expected output</p>
-                      <pre className={pre}>{sample.expected}</pre>
-                    </div>
-                  </div>
-                ))}
-                <p className={`${muted} text-xs`}>
-                  Time limit {problem.timeLimitMs} ms · memory {problem.memLimitMb} MB
-                </p>
               </div>
-            )}
-          </section>
-        </div>
+              {user && (
+                <CollaborativeEditor
+                  roomId={roomId}
+                  user={{ id: user.id, name: user.name || "Someone" }}
+                  problemId={problem?.id}
+                  starterCode={problem?.starterCode}
+                  replacesOnProblemChange={isOwner}
+                  writesStarter={isOwner || starterWriter === user.id}
+                  onCodeChange={setCode}
+                  colorOf={colorOf}
+                />
+              )}
+              {runError && (
+                <p className="border-t-2 border-zinc-800 px-4 py-2 text-sm text-red-300">
+                  {runError}
+                </p>
+              )}
+              {shown && <VerdictPanel submission={shown} color={colorOf(shown.userId)} />}
+              {shown?.status === "accepted" && problem?.analyzable && shown.problemId === problem.id && (
+                <ComplexityPanel submission={shown} expected={problem.expectedComplexity} />
+              )}
+            </section>
+
+            <section className={`${card} p-5`}>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className={`${heading} flex flex-wrap items-center gap-2`}>
+                  {problem ? problem.title : "No problem chosen"}
+                  {problem && <span className={badge(difficulty[problem.difficulty])}>{problem.difficulty}</span>}
+                </h2>
+                {isOwner && (
+                  <button type="button" onClick={() => setPicking(true)} className={button.secondary}>
+                    {problem ? "Change" : "Choose a problem"}
+                  </button>
+                )}
+              </div>
+
+              {!problem && (
+                <p className={`${muted} text-sm`}>
+                  {isOwner ? "Choose a problem to get started." : "Waiting for the room owner to choose a problem."}
+                </p>
+              )}
+
+              {problem && (
+                <div className="space-y-4 text-sm">
+                  <p className="whitespace-pre-line">
+                    {problem.statement ?? "This problem has no statement or tests yet."}
+                  </p>
+                  {problem.samples.map((sample, index) => (
+                    <div key={index} className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className={`${muted} mb-1 text-xs`}>Sample input {index + 1}</p>
+                        <pre className={pre}>{sample.input}</pre>
+                      </div>
+                      <div>
+                        <p className={`${muted} mb-1 text-xs`}>Expected output</p>
+                        <pre className={pre}>{sample.expected}</pre>
+                      </div>
+                    </div>
+                  ))}
+                  <p className={`${muted} text-xs`}>
+                    Time limit {problem.timeLimitMs} ms · memory {problem.memLimitMb} MB
+                  </p>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
 
         <div className="space-y-6">
           <RoomMembersPanel members={members} connectionState={connectionState} colorOf={colorOf} />
-          <RunHistory
-            submissions={submissions}
-            selectedId={shown?.id ?? null}
-            onSelect={(submission) => setSelectedId(submission.id)}
-            colorOf={colorOf}
-          />
+          {room.kind !== "design" && (
+            <RunHistory
+              submissions={submissions}
+              selectedId={shown?.id ?? null}
+              onSelect={(submission) => setSelectedId(submission.id)}
+              colorOf={colorOf}
+            />
+          )}
           <RoomChatComponent isConnected={isConnected} messages={messages} sendMessage={sendMessage} colorOf={colorOf} />
         </div>
       </div>

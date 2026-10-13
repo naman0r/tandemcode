@@ -23,6 +23,7 @@ api.interceptors.request.use(async (config) => {
 });
 
 export type RoomVisibility = "public" | "unlisted";
+export type RoomKind = "code" | "design";
 
 export const userApi = {
   // Idempotent: mirrors the caller's Clerk profile into the backend. Email and
@@ -51,6 +52,7 @@ export const roomApi = {
     description: string;
     visibility: RoomVisibility;
     advertised: boolean;
+    kind: RoomKind;
   }) => {
     const response = await api.post("/rooms", roomData);
     return response.data;

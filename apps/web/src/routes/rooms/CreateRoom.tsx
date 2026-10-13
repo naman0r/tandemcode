@@ -5,16 +5,62 @@ import Layout from "../../components/Layout";
 import InviteButton from "../../components/InviteButton";
 import RequireSignIn from "../../components/RequireSignIn";
 import { problemApi, roomApi } from "../../lib/api";
-import type { RoomVisibility } from "../../lib/api";
+import type { RoomKind, RoomVisibility } from "../../lib/api";
 import { inviteLink } from "../../lib/format";
 import { badge, button, card, difficulty, input, muted, title } from "../../lib/ui";
 
 type Problem = { id: string; title: string; difficulty: string };
 
-const VISIBILITY_OPTIONS: { value: RoomVisibility; label: string; hint: string }[] = [
+type Option<T> = { value: T; label: string; hint: string };
+
+const VISIBILITY_OPTIONS: Option<RoomVisibility>[] = [
   { value: "public", label: "Public", hint: "Listed on the rooms page. You can still send the link." },
   { value: "unlisted", label: "Unlisted", hint: "Not listed. Only people with the link can join." },
 ];
+
+const KIND_OPTIONS: Option<RoomKind>[] = [
+  { value: "code", label: "Coding", hint: "A shared editor, a problem and its tests." },
+  { value: "design", label: "System design", hint: "A shared whiteboard. Put the prompt in the description." },
+];
+
+const Options = <T extends string>({
+  legend,
+  name,
+  options,
+  value,
+  onChange,
+}: {
+  legend: string;
+  name: string;
+  options: Option<T>[];
+  value: T;
+  onChange: (value: T) => void;
+}) => (
+  <fieldset className="space-y-2 text-sm">
+    <legend className="mb-1 font-medium">{legend}</legend>
+    {options.map((option) => (
+      <label
+        key={option.value}
+        className={`flex cursor-pointer gap-3 border-2 px-3 py-2 ${
+          value === option.value ? "border-orange-500 bg-orange-950" : "border-zinc-700 hover:border-zinc-500"
+        }`}
+      >
+        <input
+          type="radio"
+          name={name}
+          value={option.value}
+          checked={value === option.value}
+          onChange={() => onChange(option.value)}
+          className="mt-1 accent-orange-500"
+        />
+        <span>
+          <span className="block font-medium">{option.label}</span>
+          <span className={muted}>{option.hint}</span>
+        </span>
+      </label>
+    ))}
+  </fieldset>
+);
 
 // An unlisted room is only reachable through its link, so the link is the
 // next thing to show, before the room itself.
@@ -50,6 +96,7 @@ const CreateRoomForm = () => {
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<RoomVisibility>("public");
   const [advertised, setAdvertised] = useState(false);
+  const [kind, setKind] = useState<RoomKind>("code");
   const [unlistedRoomId, setUnlistedRoomId] = useState<string | null>(null);
   const [problem, setProblem] = useState<Problem | null>(null);
   const [creating, setCreating] = useState(false);
@@ -77,6 +124,7 @@ const CreateRoomForm = () => {
         description: description.trim(),
         visibility,
         advertised: visibility === "public" && advertised,
+        kind: problemId ? "code" : kind,
       });
       // The room exists either way; a problem can still be picked inside it.
       if (problem) {
@@ -111,6 +159,8 @@ const CreateRoomForm = () => {
         </div>
       )}
 
+      {!problemId && <Options legend="What for" name="kind" options={KIND_OPTIONS} value={kind} onChange={setKind} />}
+
       <label className="block text-sm">
         <span className="mb-1 block font-medium">Name</span>
         <input
@@ -132,36 +182,17 @@ const CreateRoomForm = () => {
           rows={3}
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          placeholder="What you want to work on"
+          placeholder={kind === "design" ? "The prompt, like: design a URL shortener" : "What you want to work on"}
         />
       </label>
 
-      <fieldset className="space-y-2 text-sm">
-        <legend className="mb-1 font-medium">Who can find it</legend>
-        {VISIBILITY_OPTIONS.map((option) => (
-          <label
-            key={option.value}
-            className={`flex cursor-pointer gap-3 border-2 px-3 py-2 ${
-              visibility === option.value
-                ? "border-orange-500 bg-orange-950"
-                : "border-zinc-700 hover:border-zinc-500"
-            }`}
-          >
-            <input
-              type="radio"
-              name="visibility"
-              value={option.value}
-              checked={visibility === option.value}
-              onChange={() => setVisibility(option.value)}
-              className="mt-1 accent-orange-500"
-            />
-            <span>
-              <span className="block font-medium">{option.label}</span>
-              <span className={muted}>{option.hint}</span>
-            </span>
-          </label>
-        ))}
-      </fieldset>
+      <Options
+        legend="Who can find it"
+        name="visibility"
+        options={VISIBILITY_OPTIONS}
+        value={visibility}
+        onChange={setVisibility}
+      />
 
       {visibility === "public" && (
         <label className="flex cursor-pointer items-start gap-3 text-sm">

@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import Layout from "../../components/Layout";
 import RequireSignIn from "../../components/RequireSignIn";
 import { roomApi } from "../../lib/api";
+import type { RoomKind } from "../../lib/api";
 import { timeAgo } from "../../lib/format";
-import { button, card, heading, muted, title } from "../../lib/ui";
+import { badge, button, card, heading, muted, title } from "../../lib/ui";
 
 type Room = {
   id: string;
@@ -14,6 +15,7 @@ type Room = {
   createdAt: string;
   advertised: boolean;
   memberCount: number;
+  kind: RoomKind;
 };
 
 const LookingForPartner = () => (
@@ -63,7 +65,10 @@ const RoomList = () => {
               <LookingForPartner />
             </div>
           )}
-          <h2 className={heading}>{room.name}</h2>
+          <h2 className={`${heading} flex flex-wrap items-center gap-2`}>
+            {room.name}
+            {room.kind === "design" && <span className={badge(undefined)}>System design</span>}
+          </h2>
           <p className={`${muted} mt-2 flex-1 text-sm`}>
             {room.description || "No description"}
           </p>

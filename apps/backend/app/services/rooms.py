@@ -94,7 +94,13 @@ class RoomService:
         self.submission_dao = submission_dao
 
     async def create_room(
-        self, name: str, description: str | None, created_by: str, visibility: str, advertised: bool
+        self,
+        name: str,
+        description: str | None,
+        created_by: str,
+        visibility: str,
+        advertised: bool,
+        kind: str,
     ) -> dict:
         # The caller is authenticated but may not have been synced into our users
         # table yet, and the room's foreign key needs that row. Checked up front
@@ -106,7 +112,7 @@ class RoomService:
             )
 
         room = await self.room_dao.create(
-            str(uuid4()), name, description, created_by, visibility, advertised, ROOMS_PER_HOUR, ROOMS_PER_DAY
+            str(uuid4()), name, description, created_by, visibility, advertised, kind, ROOMS_PER_HOUR, ROOMS_PER_DAY
         )
         if room is None:
             raise HTTPException(

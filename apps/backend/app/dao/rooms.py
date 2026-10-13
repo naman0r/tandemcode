@@ -10,7 +10,7 @@ import asyncpg
 # asking again if one of them leaves, so advertised is read off the roster.
 SELECT_ROOM = """
     SELECT r.id, r.name, r.description, r.created_by, r.is_active, r.created_at,
-           r.current_problem_id, r.visibility, u.name AS created_by_name,
+           r.current_problem_id, r.visibility, r.kind, u.name AS created_by_name,
            m.member_count, r.advertised AND m.member_count < 2 AS advertised
     FROM rooms r
     JOIN users u ON u.id = r.created_by
@@ -37,6 +37,7 @@ def _map_room(row: asyncpg.Record) -> dict:
         "currentProblemId": row["current_problem_id"],
         "visibility": row["visibility"],
         "advertised": row["advertised"],
+        "kind": row["kind"],
         "memberCount": row["member_count"],
     }
 
@@ -53,6 +54,7 @@ class RoomDAO:
         created_by: str,
         visibility: str,
         advertised: bool,
+        kind: str,
         per_hour: int,
         per_day: int,
     ) -> dict | None:
@@ -66,8 +68,8 @@ class RoomDAO:
             WHERE created_by = $1 AND created_at > NOW() - make_interval(secs => $2)
         """
         insert = """
-            INSERT INTO rooms (id, name, description, created_by, visibility, advertised)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO rooms (id, name, description, created_by, visibility, advertised, kind)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
         """
         async with self.pool.acquire() as conn:
             async with conn.transaction():
@@ -77,7 +79,7 @@ class RoomDAO:
                     or await conn.fetchval(count, created_by, 86400) >= per_day
                 ):
                     return None
-                await conn.execute(insert, room_id, name, description, created_by, visibility, advertised)
+                await conn.execute(insert, room_id, name, description, created_by, visibility, advertised, kind)
         return await self.get_by_id(room_id)
 
     async def get_by_id(self, room_id: str) -> dict | None:
