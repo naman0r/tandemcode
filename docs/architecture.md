@@ -29,7 +29,7 @@ A room has two websockets, and the web app opens one of each:
 
 Sends to many sockets go through `app/websocket/fanout.py`, which sends to each in parallel with a deadline, so one peer that stops reading cannot hold up the room. Per-user socket caps, frame budgets and chat limits are constants at the top of `room_chat.py` and `yjs.py`.
 
-A room is for coding or for system design (`rooms.kind`, chosen when it is made). A design room has a shared whiteboard (`apps/web/src/components/Whiteboard.tsx`) in place of the editor, problem and runs. The board is a `Y.Map` named `board` in the same Yjs document, over the same `/ws/yjs` relay, so the server treats it like any other editor traffic and records it for the replay.
+A room is for coding or for system design (`rooms.kind`, chosen when it is made). A design room has a shared whiteboard (`apps/web/src/components/Whiteboard.tsx`) in place of the editor, problem and runs. The board is a `Y.Map` named `board` in the same Yjs document, over the same `/ws/yjs` relay, so the server treats it like any other editor traffic and records it, so the replay plays the board back the way it plays the code.
 
 Rooms are public or unlisted, and the owner can ask for a partner, which highlights the room on the rooms page. Reading a room's runs, roster or replay requires having been in it.
 

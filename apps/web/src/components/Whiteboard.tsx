@@ -6,7 +6,7 @@ import { WebsocketProvider } from "y-websocket";
 import { Circle, Diamond, Hand, Minus, MousePointer2, MoveUpRight, Pencil, Redo2, Square, Type, Undo2 } from "lucide-react";
 import { WS_BASE_URL } from "../lib/config";
 
-type Shape = {
+export type Shape = {
   id: string;
   type: "rect" | "diamond" | "ellipse" | "arrow" | "line" | "draw" | "text";
   // An arrow or line runs from (x, y) by (w, h). A drawing is `points`, flat
@@ -220,6 +220,26 @@ const ShapeView = memo(({ shape }: { shape: Shape }) => {
     </g>
   );
 });
+
+// The board read-only, framed to fit `fit`, for the replay.
+export const Sketch = ({ shapes, fit }: { shapes: Shape[]; fit: Shape[] }) => {
+  const boxes = fit.map(box);
+  const pad = 40;
+  const left = Math.min(...boxes.map((b) => b.x)) - pad;
+  const top = Math.min(...boxes.map((b) => b.y)) - pad;
+  const right = Math.max(...boxes.map((b) => b.x + b.w)) + pad;
+  const bottom = Math.max(...boxes.map((b) => b.y + b.h)) + pad;
+  return (
+    <svg
+      className="h-[480px] w-full bg-zinc-950"
+      viewBox={boxes.length ? `${left} ${top} ${right - left} ${bottom - top}` : "0 0 800 480"}
+    >
+      {shapes.map((shape) => (
+        <ShapeView key={shape.id} shape={shape} />
+      ))}
+    </svg>
+  );
+};
 
 const Whiteboard = ({ roomId, user, colorOf }: Props) => {
   const { getToken, isLoaded, isSignedIn, sessionId } = useAuth();
