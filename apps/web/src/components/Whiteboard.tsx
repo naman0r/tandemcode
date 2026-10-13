@@ -3,18 +3,22 @@ import type { KeyboardEvent, MouseEvent, PointerEvent } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import * as Y from "yjs";
 import { WebsocketProvider } from "y-websocket";
-import { Circle, Hand, MousePointer2, MoveUpRight, Redo2, Square, Type, Undo2 } from "lucide-react";
+import { Circle, Diamond, Hand, Minus, MousePointer2, MoveUpRight, Pencil, Redo2, Square, Type, Undo2 } from "lucide-react";
 import { WS_BASE_URL } from "../lib/config";
 
 type Shape = {
   id: string;
-  type: "rect" | "ellipse" | "arrow" | "text";
-  // An arrow runs from (x, y) by (w, h); every other shape is a box with w, h >= 0.
+  type: "rect" | "diamond" | "ellipse" | "arrow" | "line" | "draw" | "text";
+  // An arrow or line runs from (x, y) by (w, h). A drawing is `points`, flat
+  // x, y pairs relative to (x, y). Every other shape is a box with w, h >= 0.
   x: number;
   y: number;
   w: number;
   h: number;
   text?: string;
+  points?: number[];
+  // Unset is INK, which is every shape drawn before colours existed.
+  color?: string;
 };
 
 type Tool = "select" | "hand" | Shape["type"];
@@ -35,12 +39,20 @@ const TOOLS: { tool: Tool; icon: typeof Square; label: string; key: string }[] =
   { tool: "hand", icon: Hand, label: "Pan", key: "h" },
   { tool: "select", icon: MousePointer2, label: "Select", key: "v" },
   { tool: "rect", icon: Square, label: "Rectangle", key: "r" },
+  { tool: "diamond", icon: Diamond, label: "Diamond", key: "d" },
   { tool: "ellipse", icon: Circle, label: "Ellipse", key: "o" },
   { tool: "arrow", icon: MoveUpRight, label: "Arrow", key: "a" },
+  { tool: "line", icon: Minus, label: "Line", key: "l" },
+  { tool: "draw", icon: Pencil, label: "Draw", key: "p" },
   { tool: "text", icon: Type, label: "Text", key: "t" },
 ];
 
 const INK = "#e4e4e7";
+// The room's person colours, so the board reads as part of the same product.
+const COLORS = [INK, "#f97316", "#0ea5e9", "#22c55e", "#eab308", "#ef4444", "#a855f7"];
+// A drawing keeps a point only this far from the last, which keeps a long
+// scribble to a few hundred numbers.
+const PEN_STEP = 3;
 const FONT = 24;
 const LINE = FONT * 1.2;
 // Jersey 10 runs narrow; this is close enough to size a selection box.
@@ -100,16 +112,26 @@ const outline = (shape: Shape): string => {
   const rand = random(shape.id);
   const { x, y, w, h } = shape;
   const twice = (draw: () => string) => draw() + draw();
+  const polygon = (corners: number[][]) =>
+    twice(() => corners.map(([cx, cy], i) => edge(cx, cy, ...(corners[(i + 1) % corners.length] as [number, number]), rand)).join(""));
   if (shape.type === "rect") {
-    const corners = [
+    return polygon([
       [x, y],
       [x + w, y],
       [x + w, y + h],
       [x, y + h],
-    ];
-    return twice(() => corners.map(([cx, cy], i) => edge(cx, cy, ...(corners[(i + 1) % 4] as [number, number]), rand)).join(""));
+    ]);
+  }
+  if (shape.type === "diamond") {
+    return polygon([
+      [x + w / 2, y],
+      [x + w, y + h / 2],
+      [x + w / 2, y + h],
+      [x, y + h / 2],
+    ]);
   }
   if (shape.type === "ellipse") return twice(() => loop(x + w / 2, y + h / 2, w / 2, h / 2, rand));
+  if (shape.type === "line") return twice(() => edge(x, y, x + w, y + h, rand));
   if (shape.type === "arrow") {
     const angle = Math.atan2(h, w);
     const head = Math.min(18, Math.hypot(w, h) / 3);
@@ -117,15 +139,36 @@ const outline = (shape: Shape): string => {
       edge(x + w, y + h, x + w - head * Math.cos(angle + turn), y + h - head * Math.sin(angle + turn), rand);
     return twice(() => edge(x, y, x + w, y + h, rand) + barb(0.5) + barb(-0.5));
   }
+  if (shape.type === "draw" && shape.points) {
+    // The hand already wobbles; a smooth curve through the midpoints is enough.
+    const p = shape.points;
+    let path = `M${x + p[0]} ${y + p[1]}`;
+    for (let i = 2; i < p.length - 2; i += 2) {
+      path += `Q${x + p[i]} ${y + p[i + 1]} ${x + (p[i] + p[i + 2]) / 2} ${y + (p[i + 1] + p[i + 3]) / 2}`;
+    }
+    return `${path}L${x + p[p.length - 2]} ${y + p[p.length - 1]}`;
+  }
   return "";
 };
 
-const box = (shape: Shape) => ({
-  x: Math.min(shape.x, shape.x + shape.w),
-  y: Math.min(shape.y, shape.y + shape.h),
-  w: Math.abs(shape.w),
-  h: Math.abs(shape.h),
-});
+const box = (shape: Shape) => {
+  if (shape.points) {
+    const xs = shape.points.filter((_, i) => i % 2 === 0);
+    const ys = shape.points.filter((_, i) => i % 2 === 1);
+    const left = Math.min(...xs);
+    const top = Math.min(...ys);
+    return { x: shape.x + left, y: shape.y + top, w: Math.max(...xs) - left, h: Math.max(...ys) - top };
+  }
+  return {
+    x: Math.min(shape.x, shape.x + shape.w),
+    y: Math.min(shape.y, shape.y + shape.h),
+    w: Math.abs(shape.w),
+    h: Math.abs(shape.h),
+  };
+};
+
+// Lines, arrows and drawings are hit along their stroke, not across their box.
+const stroked = (shape: Shape) => shape.type === "arrow" || shape.type === "line" || shape.type === "draw";
 
 const lines = (text: string) => text.split("\n");
 
@@ -134,11 +177,11 @@ const textSize = (text: string) => ({
   h: lines(text).length * LINE,
 });
 
-const Label = ({ text, x, y, centered }: { text: string; x: number; y: number; centered: boolean }) => (
+const Label = ({ text, x, y, centered, color }: { text: string; x: number; y: number; centered: boolean; color: string }) => (
   <text
     x={x}
     y={centered ? y - ((lines(text).length - 1) * LINE) / 2 : y + LINE / 2}
-    fill={INK}
+    fill={color}
     fontFamily='"Jersey 10", monospace'
     fontSize={FONT}
     textAnchor={centered ? "middle" : "start"}
@@ -155,15 +198,25 @@ const Label = ({ text, x, y, centered }: { text: string; x: number; y: number; c
 // Memoised: Y.Map hands back the same object for a shape until it changes.
 const ShapeView = memo(({ shape }: { shape: Shape }) => {
   const { x, y, w, h } = box(shape);
+  const color = shape.color ?? INK;
+  const path = outline(shape);
   return (
     <g data-id={shape.id}>
-      {shape.type === "arrow" ? (
-        <line x1={shape.x} y1={shape.y} x2={shape.x + shape.w} y2={shape.y + shape.h} stroke="transparent" strokeWidth={14} />
+      {stroked(shape) ? (
+        <path d={path} fill="none" stroke="transparent" strokeWidth={14} />
       ) : (
         <rect x={x} y={y} width={w} height={h} fill="transparent" />
       )}
-      <path d={outline(shape)} fill="none" stroke={INK} strokeWidth={2} strokeLinecap="round" />
-      {shape.text && <Label text={shape.text} x={shape.type === "text" ? x : x + w / 2} y={shape.type === "text" ? y : y + h / 2} centered={shape.type !== "text"} />}
+      <path d={path} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      {shape.text && (
+        <Label
+          text={shape.text}
+          x={shape.type === "text" ? x : x + w / 2}
+          y={shape.type === "text" ? y : y + h / 2}
+          centered={shape.type !== "text"}
+          color={color}
+        />
+      )}
     </g>
   );
 });
@@ -184,6 +237,7 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
   const [shapes, setShapes] = useState<Shape[]>([]);
   const [peers, setPeers] = useState<Peer[]>([]);
   const [tool, setTool] = useState<Tool>("select");
+  const [color, setColor] = useState(INK);
   const [view, setView] = useState<View>({ x: 0, y: 0, zoom: 1 });
   const [selected, setSelected] = useState<string | null>(null);
   // The shape being drawn or dragged. It is only written to the board when the
@@ -283,7 +337,7 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
 
   const newText = (event: { clientX: number; clientY: number }): Shape => {
     const point = toBoard(event);
-    return { id: crypto.randomUUID(), type: "text", x: point.x, y: point.y - LINE / 2, w: 0, h: 0, text: "" };
+    return { id: crypto.randomUUID(), type: "text", x: point.x, y: point.y - LINE / 2, w: 0, h: 0, text: "", color };
   };
 
   const down = (event: PointerEvent<SVGSVGElement>) => {
@@ -299,13 +353,17 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
       const id = hit(event);
       const shape = id ? board.shapes.get(id) : undefined;
       setSelected(id);
-      if (shape) gesture.current = { kind: "move", ...point, shape };
+      if (shape) {
+        gesture.current = { kind: "move", ...point, shape };
+        setColor(shape.color ?? INK);
+      }
     } else if (tool === "text") {
       // The text box opens on release: opening it now would lose focus to the
       // board as the press finishes.
       gesture.current = { kind: "text" };
     } else {
-      const shape = { id: crypto.randomUUID(), type: tool, ...point, w: 0, h: 0 };
+      const shape: Shape = { id: crypto.randomUUID(), type: tool, ...point, w: 0, h: 0, color };
+      if (tool === "draw") shape.points = [0, 0];
       gesture.current = { kind: "draw", ...point, shape };
       setDraft(shape);
     }
@@ -323,9 +381,17 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
       setView({ ...current.view, x: current.view.x + event.clientX - current.clientX, y: current.view.y + event.clientY - current.clientY });
     } else if (current?.kind === "move") {
       setDraft({ ...current.shape, x: current.shape.x + point.x - current.x, y: current.shape.y + point.y - current.y });
+    } else if (current?.kind === "draw" && current.shape.points) {
+      const points = current.shape.points;
+      const dx = Math.round(point.x - current.x);
+      const dy = Math.round(point.y - current.y);
+      if (Math.hypot(dx - points[points.length - 2], dy - points[points.length - 1]) >= PEN_STEP) {
+        current.shape = { ...current.shape, points: [...points, dx, dy] };
+        setDraft(current.shape);
+      }
     } else if (current?.kind === "draw") {
       const shape = { ...current.shape, w: point.x - current.x, h: point.y - current.y };
-      setDraft(shape.type === "arrow" ? shape : { ...shape, ...box(shape) });
+      setDraft(shape.type === "arrow" || shape.type === "line" ? shape : { ...shape, ...box(shape) });
     }
   };
 
@@ -336,7 +402,8 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
       setEditing(newText(event));
       setTool("select");
     }
-    if (board && draft && current?.kind === "draw" && Math.hypot(draft.w, draft.h) > 4) {
+    const sized = draft && (draft.points ? draft.points.length > 4 : Math.hypot(draft.w, draft.h) > 4);
+    if (board && draft && current?.kind === "draw" && sized) {
       board.shapes.set(draft.id, draft);
       setSelected(draft.id);
       setTool("select");
@@ -352,7 +419,7 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
     const id = hit(event);
     const shape = id ? board.shapes.get(id) : undefined;
     if (!shape) setEditing(newText(event));
-    else if (shape.type !== "arrow") setEditing({ ...shape, text: shape.text ?? "" });
+    else if (!stroked(shape)) setEditing({ ...shape, text: shape.text ?? "" });
   };
 
   const finishEditing = () => {
@@ -460,8 +527,9 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
           onBlur={finishEditing}
           onKeyDown={(event) => event.key === "Escape" && event.currentTarget.blur()}
           spellCheck={false}
-          className="absolute resize-none overflow-hidden bg-transparent font-pixel whitespace-pre text-zinc-200 outline-none"
+          className="absolute resize-none overflow-hidden bg-transparent font-pixel whitespace-pre outline-none"
           style={{
+            color: editing.color ?? INK,
             fontSize: FONT * view.zoom,
             lineHeight: 1.2,
             width: (editingSize.w + CHAR) * view.zoom,
@@ -488,6 +556,26 @@ const Whiteboard = ({ roomId, user, colorOf }: Props) => {
           >
             <Icon className="h-4 w-4" />
           </button>
+        ))}
+      </div>
+
+      <div className={`${toolbar} top-4 left-4 flex-col gap-1.5 p-1.5`} role="radiogroup" aria-label="Colour">
+        {COLORS.map((swatch) => (
+          <button
+            key={swatch}
+            type="button"
+            role="radio"
+            aria-checked={color === swatch}
+            aria-label={swatch}
+            title={selection && !draft ? "Colour the selected shape" : "Colour for new shapes"}
+            onClick={() => {
+              setColor(swatch);
+              const shape = selected && board?.shapes.get(selected);
+              if (board && shape) board.shapes.set(shape.id, { ...shape, color: swatch });
+            }}
+            className={`h-5 w-5 ${color === swatch ? "outline-2 outline-offset-2 outline-zinc-100" : ""}`}
+            style={{ backgroundColor: swatch }}
+          />
         ))}
       </div>
 
