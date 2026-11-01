@@ -1,6 +1,6 @@
 # Test-only. Kept out of requirements.txt so the runtime image does not
 # ship a test framework.
-pytest>=9.1.1,<10.0.0
+pytest>=9.2.0,<10.0.0
 
 # A websocket regression tends to block a receive rather than raise. Without a
 # hard per-test cap, that hangs CI instead of failing it.
